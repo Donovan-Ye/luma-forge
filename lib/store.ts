@@ -32,16 +32,18 @@ export interface CropState {
 }
 
 interface EditorState {
-  originalImage: string | null; // Data URL
-  processedImage: string | null; // Data URL for preview
-  
+  originalImage: string | null; // Data URL (Full Resolution)
+  previewImage: string | null; // Data URL (Low Resolution for editing)
+  processedImage: string | null; // Data URL for result preview
+
   adjustments: ImageAdjustments;
   crop: CropState;
-  
+
   history: { adjustments: ImageAdjustments; crop: CropState }[];
   historyIndex: number;
-  
+
   setImage: (imageData: string) => void;
+  setPreviewImage: (imageData: string) => void;
   updateAdjustments: (updates: Partial<ImageAdjustments>) => void;
   updateCrop: (updates: Partial<CropState>) => void;
   undo: () => void;
@@ -50,10 +52,10 @@ interface EditorState {
 }
 
 const DEFAULT_CURVES: Curves = {
-    master: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    red: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    green: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    blue: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  master: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  red: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  green: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  blue: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
 };
 
 const DEFAULT_ADJUSTMENTS: ImageAdjustments = {
@@ -80,36 +82,42 @@ const DEFAULT_CROP: CropState = {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   originalImage: null,
+  previewImage: null,
   processedImage: null,
-  
+
   adjustments: { ...DEFAULT_ADJUSTMENTS },
   crop: { ...DEFAULT_CROP },
-  
+
   history: [],
   historyIndex: -1,
-  
+
   setImage: (imageData) => {
     set({
       originalImage: imageData,
+      previewImage: null, // Will be set by UI
       processedImage: imageData,
-      adjustments: { 
-          ...DEFAULT_ADJUSTMENTS, 
-          curves: JSON.parse(JSON.stringify(DEFAULT_CURVES)) 
+      adjustments: {
+        ...DEFAULT_ADJUSTMENTS,
+        curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
       },
       crop: { ...DEFAULT_CROP },
       history: [],
       historyIndex: -1,
     });
   },
-  
+
+  setPreviewImage: (imageData) => {
+    set({ previewImage: imageData });
+  },
+
   updateAdjustments: (updates) => {
     const { adjustments, history, historyIndex } = get();
     const newAdjustments = { ...adjustments, ...updates };
-    
+
     // Add to history
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ adjustments, crop: get().crop });
-    
+
     set({
       adjustments: newAdjustments,
       history: newHistory,
@@ -118,10 +126,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   updateCrop: (updates) => {
-     const { crop, history, historyIndex } = get();
-     const newCrop = { ...crop, ...updates };
+    const { crop, history, historyIndex } = get();
+    const newCrop = { ...crop, ...updates };
 
-     // Add to history
+    // Add to history
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ adjustments: get().adjustments, crop });
 
@@ -131,7 +139,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       historyIndex: newHistory.length - 1,
     });
   },
-  
+
   undo: () => {
     const { history, historyIndex } = get();
     if (historyIndex >= 0) {
@@ -143,7 +151,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     }
   },
-  
+
   redo: () => {
     const { history, historyIndex } = get();
     if (historyIndex < history.length - 1) {
@@ -157,14 +165,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   reset: () => {
-      set({
-          adjustments: { 
-              ...DEFAULT_ADJUSTMENTS,
-              curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
-          },
-          crop: { ...DEFAULT_CROP },
-          history: [],
-          historyIndex: -1,
-      });
+    set({
+      adjustments: {
+        ...DEFAULT_ADJUSTMENTS,
+        curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
+      },
+      crop: { ...DEFAULT_CROP },
+      history: [],
+      historyIndex: -1,
+    });
   }
 }));
