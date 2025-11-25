@@ -50,19 +50,38 @@ export function ImageEditor() {
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
 
-  // Handle global mouse/touch release for show original button
+  // Handle global mouse/touch/keyboard events for show original button
   useEffect(() => {
-    if (!showOriginal) return;
-
-    const handleMouseUp = () => setShowOriginal(false);
-    const handleTouchEnd = () => setShowOriginal(false);
+    const handleMouseUp = () => {
+      if (showOriginal) setShowOriginal(false);
+    };
+    const handleTouchEnd = () => {
+      if (showOriginal) setShowOriginal(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('e.code', e.code)
+      // Only trigger if spacebar is pressed and user is not typing in an input/textarea
+      if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setShowOriginal(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setShowOriginal(false);
+      }
+    };
 
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     return () => {
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [showOriginal]);
 
@@ -244,22 +263,30 @@ export function ImageEditor() {
             >
               <RotateCcw className="w-4 h-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setShowOriginal(true);
-              }}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                setShowOriginal(true);
-              }}
-              className={`text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
-              title="Hold to view original image"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
+            <div className="relative group">
+              <Button
+                variant="ghost"
+                size="icon"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setShowOriginal(true);
+                }}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  setShowOriginal(true);
+                }}
+                className={`text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
+                title="Hold to view original image (or press Space)"
+              >
+                <Eye className="w-4 h-4" />
+              </Button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-zinc-300 bg-zinc-800 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                Hold to view original
+                <span className="ml-1.5 text-zinc-500">(Space)</span>
+                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-zinc-800"></div>
+              </div>
+            </div>
           </div>
         </div>
 
