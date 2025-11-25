@@ -17,7 +17,8 @@ import {
   Image as ImageIcon,
   Maximize2,
   Minus,
-  Plus
+  Plus,
+  Eye
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { processImage } from '@/lib/image-processing/canvas-utils';
@@ -42,11 +43,28 @@ export function ImageEditor() {
   const [isCropping, setIsCropping] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Determine if undo/redo should be enabled
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+
+  // Handle global mouse/touch release for show original button
+  useEffect(() => {
+    if (!showOriginal) return;
+
+    const handleMouseUp = () => setShowOriginal(false);
+    const handleTouchEnd = () => setShowOriginal(false);
+
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [showOriginal]);
 
   // Handle scroll zoom with native event listener
   useEffect(() => {
@@ -226,6 +244,22 @@ export function ImageEditor() {
             >
               <RotateCcw className="w-4 h-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setShowOriginal(true);
+              }}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                setShowOriginal(true);
+              }}
+              className={`text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
+              title="Hold to view original image"
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
@@ -257,7 +291,19 @@ export function ImageEditor() {
             ref={canvasRef}
             className="flex-1 relative overflow-hidden flex items-center justify-center p-8"
           >
-            {processedImage ? (
+            {showOriginal && originalImage ? (
+              <img
+                src={originalImage}
+                alt="Original"
+                className="max-w-full max-h-full object-contain shadow-2xl ring-1 ring-zinc-800 select-none"
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transition: zoomLevel === 1 ? 'transform 0.2s' : 'none',
+                  transformOrigin: 'center center'
+                }}
+                draggable={false}
+              />
+            ) : processedImage ? (
               <img
                 src={processedImage}
                 alt="Preview"
