@@ -42,10 +42,57 @@ export function ImageEditor() {
   const [isCropping, setIsCropping] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Determine if undo/redo should be enabled
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+
+  // Handle scroll zoom with native event listener
+  useEffect(() => {
+    if (isCropping || !processedImage) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const canvasElement = canvasRef.current;
+      if (!canvasElement) return;
+
+      // Check if the event is within the canvas area
+      const rect = canvasElement.getBoundingClientRect();
+      const isInsideCanvas =
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+
+      if (!isInsideCanvas) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Use ctrl/cmd key for more precise zoom control
+      const isPreciseZoom = e.ctrlKey || e.metaKey;
+      const zoomFactor = isPreciseZoom ? 1.05 : 1.15;
+
+      // deltaY > 0 means scrolling down (zoom out), deltaY < 0 means scrolling up (zoom in)
+      const isZoomIn = e.deltaY < 0;
+
+      setZoomLevel((prevZoom) => {
+        const newZoom = isZoomIn
+          ? prevZoom * zoomFactor
+          : prevZoom / zoomFactor;
+
+        // Clamp between 0.1x and 5x
+        return Math.max(0.1, Math.min(5, newZoom));
+      });
+    };
+
+    // Attach to window to catch all wheel events, then filter by position
+    window.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [isCropping, processedImage]);
 
   // Generate low-res preview when original image changes
   useEffect(() => {
@@ -206,13 +253,21 @@ export function ImageEditor() {
         {/* Main Canvas Area */}
         <div className="flex-1 bg-zinc-950 relative flex flex-col">
           {/* Canvas Viewport */}
-          <div className="flex-1 relative overflow-hidden flex items-center justify-center p-8">
+          <div
+            ref={canvasRef}
+            className="flex-1 relative overflow-hidden flex items-center justify-center p-8"
+          >
             {processedImage ? (
               <img
                 src={processedImage}
                 alt="Preview"
-                className="max-w-full max-h-full object-contain shadow-2xl ring-1 ring-zinc-800"
-                style={{ transform: `scale(${zoomLevel})`, transition: 'transform 0.2s' }}
+                className="max-w-full max-h-full object-contain shadow-2xl ring-1 ring-zinc-800 select-none"
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transition: zoomLevel === 1 ? 'transform 0.2s' : 'none',
+                  transformOrigin: 'center center'
+                }}
+                draggable={false}
               />
             ) : (
               <Loader2 className="w-8 h-8 animate-spin text-zinc-600" />
@@ -228,7 +283,8 @@ export function ImageEditor() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 rounded-none"
-                  onClick={() => setZoomLevel(Math.max(0.1, zoomLevel - 0.1))}
+                  onClick={() => setZoomLevel(Math.max(0.1, zoomLevel / 1.1))}
+                  disabled={zoomLevel <= 0.1}
                 >
                   <Minus className="w-3 h-3" />
                 </Button>
@@ -236,12 +292,19 @@ export function ImageEditor() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 rounded-none"
-                  onClick={() => setZoomLevel(Math.min(3, zoomLevel + 0.1))}
+                  onClick={() => setZoomLevel(Math.min(5, zoomLevel * 1.1))}
+                  disabled={zoomLevel >= 5}
                 >
                   <Plus className="w-3 h-3" />
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoomLevel(1)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setZoomLevel(1)}
+                disabled={zoomLevel === 1}
+              >
                 <Maximize2 className="w-3 h-3" />
               </Button>
             </div>
