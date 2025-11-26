@@ -460,6 +460,7 @@ export function ImageEditor() {
             className={`flex-1 relative overflow-hidden flex items-center justify-center p-8 ${isDragging ? 'cursor-grabbing' : zoomLevel > 1 ? 'cursor-grab' : ''}`}
           >
             {showOriginal && originalImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 ref={imageRef}
                 src={originalImage}
@@ -473,6 +474,7 @@ export function ImageEditor() {
                 draggable={false}
               />
             ) : processedImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 ref={imageRef}
                 src={processedImage}
