@@ -322,7 +322,7 @@ export function ImageEditor() {
       } finally {
         if (active) setIsProcessing(false);
       }
-    }, 30); // Faster debounce for preview
+    }, 0); // Faster debounce for preview
 
     return () => {
       active = false;

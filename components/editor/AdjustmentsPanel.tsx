@@ -2,16 +2,15 @@
 
 import { useState } from 'react';
 import { useEditorStore, ImageAdjustments, Point } from '@/lib/store';
-import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { 
-  Accordion, 
-  AccordionContent, 
-  AccordionItem, 
-  AccordionTrigger 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
 } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sun, Contrast, Droplets, Thermometer, Zap, Move, Activity, Spline, Sparkles, Aperture } from 'lucide-react';
+import { Sun, Spline, Sparkles, Aperture } from 'lucide-react';
 import { CurveEditor } from './CurveEditor';
 
 export function AdjustmentsPanel() {
@@ -41,7 +40,7 @@ export function AdjustmentsPanel() {
   return (
     <div className="w-full h-full">
       <Accordion type="multiple" defaultValue={["light", "color", "detail"]} className="w-full">
-        
+
         {/* Light Section */}
         <AccordionItem value="light">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
@@ -85,7 +84,7 @@ export function AdjustmentsPanel() {
         {/* Color Section */}
         <AccordionItem value="color">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
-             <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Aperture className="w-4 h-4 text-muted-foreground" />
               <span>Color</span>
             </div>
@@ -124,14 +123,14 @@ export function AdjustmentsPanel() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-6">
-             <AdjustmentSlider
+            <AdjustmentSlider
               label="Sharpness"
               value={adjustments.sharpness}
               onChange={handleChange('sharpness')}
               min={0}
               max={100}
             />
-             <AdjustmentSlider
+            <AdjustmentSlider
               label="Blur"
               value={adjustments.blur}
               onChange={handleChange('blur')}
@@ -150,29 +149,29 @@ export function AdjustmentsPanel() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-4">
-            <Select 
-                value={activeCurve} 
-                onValueChange={(v: 'master' | 'red' | 'green' | 'blue') => setActiveCurve(v)}
+            <Select
+              value={activeCurve}
+              onValueChange={(v: 'master' | 'red' | 'green' | 'blue') => setActiveCurve(v)}
             >
-                <SelectTrigger className="w-full">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="master">Master (RGB)</SelectItem>
-                    <SelectItem value="red">Red Channel</SelectItem>
-                    <SelectItem value="green">Green Channel</SelectItem>
-                    <SelectItem value="blue">Blue Channel</SelectItem>
-                </SelectContent>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="master">Master (RGB)</SelectItem>
+                <SelectItem value="red">Red Channel</SelectItem>
+                <SelectItem value="green">Green Channel</SelectItem>
+                <SelectItem value="blue">Blue Channel</SelectItem>
+              </SelectContent>
             </Select>
-            
+
             <div className="pt-2 pb-2">
-                {adjustments.curves && (
-                    <CurveEditor 
-                        points={adjustments.curves[activeCurve]} 
-                        onChange={handleCurveChange}
-                        color={curveColors[activeCurve]}
-                    />
-                )}
+              {adjustments.curves && (
+                <CurveEditor
+                  points={adjustments.curves[activeCurve]}
+                  onChange={handleCurveChange}
+                  color={curveColors[activeCurve]}
+                />
+              )}
             </div>
           </AccordionContent>
         </AccordionItem>
