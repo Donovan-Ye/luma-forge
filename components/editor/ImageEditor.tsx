@@ -44,7 +44,12 @@ export function ImageEditor() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // Determine if undo/redo should be enabled
   const canUndo = historyIndex >= 0;
@@ -59,7 +64,6 @@ export function ImageEditor() {
       if (showOriginal) setShowOriginal(false);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      console.log('e.code', e.code)
       // Only trigger if spacebar is pressed and user is not typing in an input/textarea
       if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
@@ -84,6 +88,143 @@ export function ImageEditor() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [showOriginal]);
+
+  // Reset pan when zoom resets to 1x
+  useEffect(() => {
+    if (zoomLevel === 1) {
+      setPanX(0);
+      setPanY(0);
+    }
+  }, [zoomLevel]);
+
+  // Handle drag and pan
+  useEffect(() => {
+    if (isCropping || !processedImage || zoomLevel === 1) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Only start dragging if clicking on the image or canvas area
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'IMG' || target === canvasRef.current) {
+        e.preventDefault();
+        setIsDragging(true);
+        dragStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          panX,
+          panY
+        };
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragStartRef.current || !canvasRef.current || !imageRef.current) return;
+      e.preventDefault();
+
+      const deltaX = e.clientX - dragStartRef.current.x;
+      const deltaY = e.clientY - dragStartRef.current.y;
+
+      const newPanX = dragStartRef.current.panX + deltaX;
+      const newPanY = dragStartRef.current.panY + deltaY;
+
+      // Calculate bounds based on image and canvas dimensions
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const imgRect = imageRef.current.getBoundingClientRect();
+
+      // Calculate the scaled image dimensions
+      const scaledWidth = imgRect.width / zoomLevel;
+      const scaledHeight = imgRect.height / zoomLevel;
+      const scaledImageWidth = scaledWidth * zoomLevel;
+      const scaledImageHeight = scaledHeight * zoomLevel;
+
+      // Calculate max pan bounds (allow some overflow for better UX)
+      const maxPanX = Math.max(0, (scaledImageWidth - canvasRect.width) / 2);
+      const maxPanY = Math.max(0, (scaledImageHeight - canvasRect.height) / 2);
+
+      // Constrain pan values
+      const constrainedPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+      const constrainedPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+      setPanX(constrainedPanX);
+      setPanY(constrainedPanY);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'IMG' || target === canvasRef.current) {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          setIsDragging(true);
+          dragStartRef.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+            panX,
+            panY
+          };
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging || !dragStartRef.current || e.touches.length !== 1 || !canvasRef.current || !imageRef.current) return;
+      e.preventDefault();
+
+      const deltaX = e.touches[0].clientX - dragStartRef.current.x;
+      const deltaY = e.touches[0].clientY - dragStartRef.current.y;
+
+      const newPanX = dragStartRef.current.panX + deltaX;
+      const newPanY = dragStartRef.current.panY + deltaY;
+
+      // Calculate bounds based on image and canvas dimensions
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const imgRect = imageRef.current.getBoundingClientRect();
+
+      // Calculate the scaled image dimensions
+      const scaledWidth = imgRect.width / zoomLevel;
+      const scaledHeight = imgRect.height / zoomLevel;
+      const scaledImageWidth = scaledWidth * zoomLevel;
+      const scaledImageHeight = scaledHeight * zoomLevel;
+
+      // Calculate max pan bounds (allow some overflow for better UX)
+      const maxPanX = Math.max(0, (scaledImageWidth - canvasRect.width) / 2);
+      const maxPanY = Math.max(0, (scaledImageHeight - canvasRect.height) / 2);
+
+      // Constrain pan values
+      const constrainedPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+      const constrainedPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+      setPanX(constrainedPanX);
+      setPanY(constrainedPanY);
+    };
+
+    const handleTouchEnd = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    const canvasElement = canvasRef.current;
+    if (!canvasElement) return;
+
+    canvasElement.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    canvasElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      canvasElement.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      canvasElement.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isCropping, processedImage, zoomLevel, isDragging, panX, panY]);
 
   // Handle scroll zoom with native event listener
   useEffect(() => {
@@ -316,28 +457,30 @@ export function ImageEditor() {
           {/* Canvas Viewport */}
           <div
             ref={canvasRef}
-            className="flex-1 relative overflow-hidden flex items-center justify-center p-8"
+            className={`flex-1 relative overflow-hidden flex items-center justify-center p-8 ${isDragging ? 'cursor-grabbing' : zoomLevel > 1 ? 'cursor-grab' : ''}`}
           >
             {showOriginal && originalImage ? (
               <img
+                ref={imageRef}
                 src={originalImage}
                 alt="Original"
                 className="max-w-full max-h-full object-contain shadow-2xl ring-1 ring-zinc-800 select-none"
                 style={{
-                  transform: `scale(${zoomLevel})`,
-                  transition: zoomLevel === 1 ? 'transform 0.2s' : 'none',
+                  transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
+                  transition: zoomLevel === 1 && !isDragging ? 'transform 0.2s' : 'none',
                   transformOrigin: 'center center'
                 }}
                 draggable={false}
               />
             ) : processedImage ? (
               <img
+                ref={imageRef}
                 src={processedImage}
                 alt="Preview"
                 className="max-w-full max-h-full object-contain shadow-2xl ring-1 ring-zinc-800 select-none"
                 style={{
-                  transform: `scale(${zoomLevel})`,
-                  transition: zoomLevel === 1 ? 'transform 0.2s' : 'none',
+                  transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
+                  transition: zoomLevel === 1 && !isDragging ? 'transform 0.2s' : 'none',
                   transformOrigin: 'center center'
                 }}
                 draggable={false}
@@ -375,7 +518,11 @@ export function ImageEditor() {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => setZoomLevel(1)}
+                onClick={() => {
+                  setZoomLevel(1);
+                  setPanX(0);
+                  setPanY(0);
+                }}
                 disabled={zoomLevel === 1}
               >
                 <Maximize2 className="w-3 h-3" />
