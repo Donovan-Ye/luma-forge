@@ -19,6 +19,10 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
   const [histogram, setHistogram] = useState<number[]>([]);
   // Track the original point being dragged to prevent drift after re-sorting
   const dragStartPointRef = useRef<Point | null>(null);
+  // Local state for immediate visual feedback during dragging
+  const [localPoints, setLocalPoints] = useState<Point[] | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const onChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate histogram from preview image
   useEffect(() => {
@@ -75,9 +79,11 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
   }, [previewImage, channel]);
 
   // Sort points by x to ensure function validity
+  // Use local points during dragging for immediate feedback, otherwise use props
   const sortedPoints = useMemo(() => {
-    return [...points].sort((a, b) => a.x - b.x);
-  }, [points]);
+    const pointsToUse = localPoints || points;
+    return [...pointsToUse].sort((a, b) => a.x - b.x);
+  }, [points, localPoints]);
 
   // Generate piecewise linear curve path that passes through all points
   // This matches the linear interpolation used in createLUT
@@ -160,6 +166,8 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     setIsDragging(true);
     // Store the original point coordinates to track it through re-sorts
     dragStartPointRef.current = { ...sortedPoints[index] };
+    // Initialize local points for immediate visual feedback
+    setLocalPoints([...sortedPoints]);
   };
 
   const handleSvgMouseDown = (e: React.MouseEvent) => {
@@ -177,6 +185,8 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
       setActivePointIndex(closestIndex);
       setIsDragging(true);
       dragStartPointRef.current = { ...sortedPoints[closestIndex] };
+      // Initialize local points for immediate visual feedback
+      setLocalPoints([...sortedPoints]);
       return;
     }
 
@@ -215,77 +225,115 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     const handleMouseMove = (e: MouseEvent) => {
       if (!svgRef.current || !dragStartPointRef.current) return;
 
-      const { x, y } = getCoordinates(e);
-      const currentPoints = [...sortedPoints];
-      const originalPoint = dragStartPointRef.current;
-
-      // Find the point we're dragging by matching the original coordinates
-      // This is more reliable than using index after re-sorting
-      let targetIndex = currentPoints.findIndex(
-        (p) => Math.abs(p.x - originalPoint.x) < 0.001 && Math.abs(p.y - originalPoint.y) < 0.001
-      );
-
-      // Fallback to activePointIndex if we can't find it
-      if (targetIndex === -1) {
-        targetIndex = activePointIndex;
+      // Cancel any pending animation frame
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
       }
 
-      // Ensure we have valid points array
-      if (targetIndex < 0 || targetIndex >= currentPoints.length) return;
+      // Use requestAnimationFrame for smooth updates
+      rafRef.current = requestAnimationFrame(() => {
+        if (!svgRef.current || !dragStartPointRef.current) return;
 
-      // Constrain X for start/end points
-      if (targetIndex === 0) {
-        currentPoints[0] = { x: 0, y: Math.max(0, Math.min(1, y)) };
-      } else if (targetIndex === currentPoints.length - 1) {
-        currentPoints[targetIndex] = { x: 1, y: Math.max(0, Math.min(1, y)) };
-      } else {
-        // Constrain X between neighbors
-        const prev = currentPoints[targetIndex - 1];
-        const next = currentPoints[targetIndex + 1];
-        const constrainedX = Math.max(prev.x + 0.01, Math.min(next.x - 0.01, x));
-        currentPoints[targetIndex] = {
-          x: constrainedX,
-          y: Math.max(0, Math.min(1, y))
-        };
-      }
+        const { x, y } = getCoordinates(e);
+        const currentPoints = localPoints ? [...localPoints] : [...sortedPoints];
+        const originalPoint = dragStartPointRef.current;
 
-      // Update the ref with new position before re-sorting
-      dragStartPointRef.current = { ...currentPoints[targetIndex] };
+        // Find the point we're dragging by matching the original coordinates
+        // This is more reliable than using index after re-sorting
+        let targetIndex = currentPoints.findIndex(
+          (p) => Math.abs(p.x - originalPoint.x) < 0.001 && Math.abs(p.y - originalPoint.y) < 0.001
+        );
 
-      // Re-sort points by x to maintain order
-      const reordered = [...currentPoints].sort((a, b) => a.x - b.x);
-
-      // Find the new index after re-sorting by matching the updated point
-      const newActiveIndex = reordered.findIndex(
-        (p) => {
-          const updatedPoint = dragStartPointRef.current!;
-          return Math.abs(p.x - updatedPoint.x) < 0.001 && Math.abs(p.y - updatedPoint.y) < 0.001;
+        // Fallback to activePointIndex if we can't find it
+        if (targetIndex === -1) {
+          targetIndex = activePointIndex;
         }
-      );
 
-      if (newActiveIndex >= 0) {
-        setActivePointIndex(newActiveIndex);
-        // Update ref to new position after sort
-        dragStartPointRef.current = { ...reordered[newActiveIndex] };
-      }
+        // Ensure we have valid points array
+        if (targetIndex < 0 || targetIndex >= currentPoints.length) return;
 
-      onChange(reordered);
+        // Constrain X for start/end points
+        if (targetIndex === 0) {
+          currentPoints[0] = { x: 0, y: Math.max(0, Math.min(1, y)) };
+        } else if (targetIndex === currentPoints.length - 1) {
+          currentPoints[targetIndex] = { x: 1, y: Math.max(0, Math.min(1, y)) };
+        } else {
+          // Constrain X between neighbors
+          const prev = currentPoints[targetIndex - 1];
+          const next = currentPoints[targetIndex + 1];
+          const constrainedX = Math.max(prev.x + 0.01, Math.min(next.x - 0.01, x));
+          currentPoints[targetIndex] = {
+            x: constrainedX,
+            y: Math.max(0, Math.min(1, y))
+          };
+        }
+
+        // Update the ref with new position before re-sorting
+        dragStartPointRef.current = { ...currentPoints[targetIndex] };
+
+        // Re-sort points by x to maintain order
+        const reordered = [...currentPoints].sort((a, b) => a.x - b.x);
+
+        // Find the new index after re-sorting by matching the updated point
+        const newActiveIndex = reordered.findIndex(
+          (p) => {
+            const updatedPoint = dragStartPointRef.current!;
+            return Math.abs(p.x - updatedPoint.x) < 0.001 && Math.abs(p.y - updatedPoint.y) < 0.001;
+          }
+        );
+
+        if (newActiveIndex >= 0) {
+          setActivePointIndex(newActiveIndex);
+          // Update ref to new position after sort
+          dragStartPointRef.current = { ...reordered[newActiveIndex] };
+        }
+
+        // Update local state immediately for visual feedback
+        setLocalPoints(reordered);
+
+        // Throttle onChange to avoid too many parent updates
+        // Clear any pending timeout
+        if (onChangeTimeoutRef.current) {
+          clearTimeout(onChangeTimeoutRef.current);
+        }
+        // Only update parent state every 16ms (60fps) to avoid lag
+        onChangeTimeoutRef.current = setTimeout(() => {
+          onChange(reordered);
+        }, 16);
+      });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       dragStartPointRef.current = null;
-      // Keep activePointIndex for visual feedback
+
+      // Cancel any pending timeout
+      if (onChangeTimeoutRef.current) {
+        clearTimeout(onChangeTimeoutRef.current);
+        onChangeTimeoutRef.current = null;
+      }
+
+      // Sync final state immediately and clear local points
+      if (localPoints) {
+        onChange(localPoints);
+        setLocalPoints(null);
+      }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (onChangeTimeoutRef.current) {
+        clearTimeout(onChangeTimeoutRef.current);
+      }
     };
-  }, [isDragging, activePointIndex, sortedPoints, onChange]);
+  }, [isDragging, activePointIndex, sortedPoints, localPoints, onChange]);
 
   // Handle point deletion (double-click)
   const handlePointDoubleClick = (index: number, e: React.MouseEvent) => {
@@ -378,7 +426,8 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
             <g
               key={i}
               transform={`translate(${cx}, ${cy}) scale(${scale})`}
-              className="cursor-pointer transition-transform"
+              className="cursor-pointer"
+              style={{ transition: isDragging ? 'none' : 'transform 0.1s' }}
             >
               <circle
                 cx="0"
