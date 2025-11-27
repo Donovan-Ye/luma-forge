@@ -163,6 +163,7 @@ export function AdjustmentsPanel() {
               onChange={handleChange('temperature')}
               min={-100}
               max={100}
+              colorGradient="temperature"
             />
             <AdjustmentSlider
               label="Tint"
@@ -170,6 +171,7 @@ export function AdjustmentsPanel() {
               onChange={handleChange('tint')}
               min={-100}
               max={100}
+              colorGradient="tint"
             />
             <AdjustmentSlider
               label="White Balance"
@@ -337,9 +339,10 @@ interface AdjustmentSliderProps {
   onChange: (value: number[]) => void;
   min: number;
   max: number;
+  colorGradient?: 'temperature' | 'tint';
 }
 
-function AdjustmentSlider({ label, value, onChange, min, max }: AdjustmentSliderProps) {
+function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: AdjustmentSliderProps) {
   // Local state for smooth dragging
   const [localValue, setLocalValue] = useState(value);
   const isDraggingRef = useRef(false);
@@ -403,6 +406,24 @@ function AdjustmentSlider({ label, value, onChange, min, max }: AdjustmentSlider
     };
   }, [handleValueCommit]);
 
+  // Calculate gradient styles for the track
+  const getTrackGradient = () => {
+    if (!colorGradient) return undefined;
+
+    if (colorGradient === 'temperature') {
+      // Blue (cool) to Orange/Red (warm)
+      // Center is neutral white
+      return 'linear-gradient(to right, rgb(59, 130, 246) 0%, rgb(147, 197, 253) 25%, rgb(255, 255, 255) 50%, rgb(255, 200, 150) 75%, rgb(255, 140, 100) 100%)';
+    } else if (colorGradient === 'tint') {
+      // Green to Magenta
+      // Center is neutral white
+      return 'linear-gradient(to right, rgb(34, 197, 94) 0%, rgb(134, 239, 172) 25%, rgb(255, 255, 255) 50%, rgb(250, 200, 250) 75%, rgb(200, 50, 200) 100%)';
+    }
+    return undefined;
+  };
+
+  const trackGradient = getTrackGradient();
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
@@ -411,15 +432,32 @@ function AdjustmentSlider({ label, value, onChange, min, max }: AdjustmentSlider
           {localValue}
         </span>
       </div>
-      <div onPointerDown={handlePointerDown}>
-        <Slider
-          value={[localValue]}
-          onValueChange={handleValueChange}
-          min={min}
-          max={max}
-          step={1}
-          className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-        />
+      <div onPointerDown={handlePointerDown} className="relative">
+        {trackGradient && (
+          <div
+            className="absolute inset-0 pointer-events-none rounded-full"
+            style={{
+              background: trackGradient,
+              height: '6px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 0,
+            }}
+          />
+        )}
+        <div className="relative z-10">
+          <Slider
+            value={[localValue]}
+            onValueChange={handleValueChange}
+            min={min}
+            max={max}
+            step={1}
+            className={cn(
+              "[&_[role=slider]]:h-3 [&_[role=slider]]:w-3",
+              trackGradient && "[&_[data-slot=slider-track]]:bg-transparent [&_[data-slot=slider-range]]:bg-transparent"
+            )}
+          />
+        </div>
       </div>
     </div>
   );
