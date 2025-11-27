@@ -88,7 +88,7 @@ export function AdjustmentsPanel() {
 
   return (
     <div className="w-full h-full">
-      <Accordion type="multiple" defaultValue={["light", "whiteBalance", "color", "detail"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["light", "whiteBalance", "color", "detail", "curves"]} className="w-full">
 
         {/* Light Section */}
         <AccordionItem value="light">
