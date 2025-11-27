@@ -9,7 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger
 } from '@/components/ui/accordion';
-import { Sun, Spline, Sparkles, Aperture } from 'lucide-react';
+import { Sun, Spline, Sparkles, Aperture, RotateCcw } from 'lucide-react';
 import { CurveEditor } from './CurveEditor';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +37,47 @@ export function AdjustmentsPanel() {
     blue: '#3b82f6'
   };
 
+  // Reset handlers for each section
+  const resetLight = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    updateAdjustments({
+      exposure: 0,
+      contrast: 0,
+      highlights: 0,
+      shadows: 0,
+    });
+  };
+
+  const resetColor = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    updateAdjustments({
+      saturation: 0,
+      temperature: 0,
+      tint: 0,
+    });
+  };
+
+  const resetDetail = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    updateAdjustments({
+      sharpness: 0,
+      blur: 0,
+    });
+  };
+
+  const resetCurves = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    const defaultCurves = {
+      master: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+      red: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+      green: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+      blue: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    };
+    updateAdjustments({
+      curves: defaultCurves,
+    });
+  };
+
   return (
     <div className="w-full h-full">
       <Accordion type="multiple" defaultValue={["light", "color", "detail"]} className="w-full">
@@ -44,9 +85,18 @@ export function AdjustmentsPanel() {
         {/* Light Section */}
         <AccordionItem value="light">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
-            <div className="flex items-center gap-2">
-              <Sun className="w-4 h-4 text-muted-foreground" />
-              <span>Light</span>
+            <div className="flex items-center justify-between w-full pr-2">
+              <div className="flex items-center gap-2">
+                <Sun className="w-4 h-4 text-muted-foreground" />
+                <span>Light</span>
+              </div>
+              <button
+                onClick={resetLight}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-accent transition-colors"
+                title="Reset Light adjustments"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-6">
@@ -84,9 +134,18 @@ export function AdjustmentsPanel() {
         {/* Color Section */}
         <AccordionItem value="color">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
-            <div className="flex items-center gap-2">
-              <Aperture className="w-4 h-4 text-muted-foreground" />
-              <span>Color</span>
+            <div className="flex items-center justify-between w-full pr-2">
+              <div className="flex items-center gap-2">
+                <Aperture className="w-4 h-4 text-muted-foreground" />
+                <span>Color</span>
+              </div>
+              <button
+                onClick={resetColor}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-accent transition-colors"
+                title="Reset Color adjustments"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-6">
@@ -117,9 +176,18 @@ export function AdjustmentsPanel() {
         {/* Detail Section */}
         <AccordionItem value="detail">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-muted-foreground" />
-              <span>Detail</span>
+            <div className="flex items-center justify-between w-full pr-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-muted-foreground" />
+                <span>Detail</span>
+              </div>
+              <button
+                onClick={resetDetail}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-accent transition-colors"
+                title="Reset Detail adjustments"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-6">
@@ -143,9 +211,18 @@ export function AdjustmentsPanel() {
         {/* Curves Section */}
         <AccordionItem value="curves">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
-            <div className="flex items-center gap-2">
-              <Spline className="w-4 h-4 text-muted-foreground" />
-              <span>Curves</span>
+            <div className="flex items-center justify-between w-full pr-2">
+              <div className="flex items-center gap-2">
+                <Spline className="w-4 h-4 text-muted-foreground" />
+                <span>Curves</span>
+              </div>
+              <button
+                onClick={resetCurves}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-accent transition-colors"
+                title="Reset Curves"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-4">
