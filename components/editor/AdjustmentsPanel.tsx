@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useEditorStore, ImageAdjustments, Point } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -12,6 +12,7 @@ import {
 import { Sun, Spline, Sparkles, Aperture, RotateCcw, Droplet } from 'lucide-react';
 import { CurveEditor } from './CurveEditor';
 import { cn } from '@/lib/utils';
+import { debounce } from 'lodash';
 
 export function AdjustmentsPanel() {
   const { adjustments, updateAdjustments } = useEditorStore();
@@ -339,22 +340,87 @@ interface AdjustmentSliderProps {
 }
 
 function AdjustmentSlider({ label, value, onChange, min, max }: AdjustmentSliderProps) {
+  // Local state for smooth dragging
+  const [localValue, setLocalValue] = useState(value);
+  const isDraggingRef = useRef(false);
+
+  // Sync local value when prop value changes (but not during drag)
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      // Defer state update to avoid synchronous setState in effect
+      requestAnimationFrame(() => {
+        if (!isDraggingRef.current) {
+          setLocalValue(value);
+        }
+      });
+    }
+  }, [value]);
+
+  // Create debounced function using lodash
+  const debouncedUpdate = useMemo(
+    () => debounce((newValue: number) => {
+      onChange([newValue]);
+    }, 50), // 50ms debounce for smooth updates
+    [onChange]
+  );
+
+  // Cleanup debounced function on unmount
+  useEffect(() => {
+    return () => {
+      debouncedUpdate.cancel();
+    };
+  }, [debouncedUpdate]);
+
+  const handleValueChange = useCallback((newValue: number[]) => {
+    const val = newValue[0];
+    setLocalValue(val); // Update local state immediately for smooth UI
+    debouncedUpdate(val); // Debounced update to store
+  }, [debouncedUpdate]);
+
+  const handleValueCommit = useCallback(() => {
+    // Cancel any pending debounced update and flush immediately
+    debouncedUpdate.cancel();
+    // Immediately commit the current value
+    onChange([localValue]);
+    isDraggingRef.current = false;
+  }, [localValue, onChange, debouncedUpdate]);
+
+  const handlePointerDown = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
+  // Handle pointer up globally to catch when dragging ends
+  useEffect(() => {
+    const handlePointerUp = () => {
+      if (isDraggingRef.current) {
+        handleValueCommit();
+      }
+    };
+
+    document.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [handleValueCommit]);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
         <span className="font-medium text-muted-foreground">{label}</span>
         <span className="tabular-nums text-muted-foreground bg-accent/50 px-1.5 py-0.5 rounded">
-          {value}
+          {localValue}
         </span>
       </div>
-      <Slider
-        value={[value]}
-        onValueChange={onChange}
-        min={min}
-        max={max}
-        step={1}
-        className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-      />
+      <div onPointerDown={handlePointerDown}>
+        <Slider
+          value={[localValue]}
+          onValueChange={handleValueChange}
+          min={min}
+          max={max}
+          step={1}
+          className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+        />
+      </div>
     </div>
   );
 }
