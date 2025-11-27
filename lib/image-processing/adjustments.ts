@@ -9,28 +9,28 @@ function createLUT(points: Point[]): Uint8Array {
     const lut = new Uint8Array(256);
     // Sort points by x
     const sorted = [...points].sort((a, b) => a.x - b.x);
-    
+
     // Linear interpolation between points
     for (let i = 0; i < 256; i++) {
         const x = i / 255;
-        
+
         // Find segment
         let p0 = sorted[0];
         let p1 = sorted[sorted.length - 1];
-        
+
         for (let j = 0; j < sorted.length - 1; j++) {
-            if (x >= sorted[j].x && x <= sorted[j+1].x) {
+            if (x >= sorted[j].x && x <= sorted[j + 1].x) {
                 p0 = sorted[j];
-                p1 = sorted[j+1];
+                p1 = sorted[j + 1];
                 break;
             }
         }
-        
+
         // Interpolate
         const range = p1.x - p0.x;
         const t = range === 0 ? 0 : (x - p0.x) / range;
         const y = p0.y + t * (p1.y - p0.y);
-        
+
         lut[i] = clamp(Math.round(y * 255));
     }
     return lut;
@@ -38,7 +38,7 @@ function createLUT(points: Point[]): Uint8Array {
 
 export function applyCurves(data: Uint8ClampedArray, curves: Curves) {
     if (!curves) return;
-    
+
     const masterLUT = createLUT(curves.master);
     const redLUT = createLUT(curves.red);
     const greenLUT = createLUT(curves.green);
@@ -47,13 +47,13 @@ export function applyCurves(data: Uint8ClampedArray, curves: Curves) {
     for (let i = 0; i < data.length; i += 4) {
         // Apply Channel Curves
         data[i] = redLUT[data[i]];
-        data[i+1] = greenLUT[data[i+1]];
-        data[i+2] = blueLUT[data[i+2]];
-        
+        data[i + 1] = greenLUT[data[i + 1]];
+        data[i + 2] = blueLUT[data[i + 2]];
+
         // Apply Master Curve
         data[i] = masterLUT[data[i]];
-        data[i+1] = masterLUT[data[i+1]];
-        data[i+2] = masterLUT[data[i+2]];
+        data[i + 1] = masterLUT[data[i + 1]];
+        data[i + 2] = masterLUT[data[i + 2]];
     }
 }
 
@@ -62,95 +62,95 @@ export function applyCurves(data: Uint8ClampedArray, curves: Curves) {
  * Note: Spatial operations like Blur and Sharpen need to be handled separately/after.
  */
 export function applyColorAdjustments(
-  data: Uint8ClampedArray, 
-  adjustments: ImageAdjustments
+    data: Uint8ClampedArray,
+    adjustments: ImageAdjustments
 ) {
-  const {
-    exposure,
-    contrast,
-    saturation,
-    temperature,
-    tint,
-    highlights,
-    shadows,
-    whiteBalance,
-  } = adjustments;
+    const {
+        exposure,
+        contrast,
+        saturation,
+        temperature,
+        tint,
+        highlights,
+        shadows,
+        whiteBalance,
+    } = adjustments;
 
-  // Pre-calculate constants
-  const exposureMultiplier = Math.pow(2, exposure / 100);
-  const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-  
-  // Saturation constants
-  const satMult = 1 + saturation / 100;
-  const rw = 0.3086, rg = 0.6094, rb = 0.0820;
+    // Pre-calculate constants
+    const exposureMultiplier = Math.pow(2, exposure / 100);
+    const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
 
-  // Temperature/Tint adjustment matrices
-  const temp = temperature / 100;
-  const rTemp = temp > 0 ? 1 + temp * 0.4 : 1;
-  const bTemp = temp < 0 ? 1 - temp * 0.4 : 1;
-  
-  const tnt = tint / 100;
-  const gTint = 1 + tnt * 0.2;
+    // Saturation constants
+    const satMult = 1 + saturation / 100;
+    const rw = 0.3086, rg = 0.6094, rb = 0.0820;
+
+    // Temperature/Tint adjustment matrices
+    const temp = temperature / 100;
+    const rTemp = temp > 0 ? 1 + temp * 0.4 : 1;
+    const bTemp = temp < 0 ? 1 - temp * 0.4 : 1;
+
+    const tnt = tint / 100;
+    const gTint = 1 + tnt * 0.2;
 
 
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
+    for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
 
-    // 1. Exposure
-    r *= exposureMultiplier;
-    g *= exposureMultiplier;
-    b *= exposureMultiplier;
+        // 1. Exposure
+        r *= exposureMultiplier;
+        g *= exposureMultiplier;
+        b *= exposureMultiplier;
 
-    // 2. Contrast
-    r = contrastFactor * (r - 128) + 128;
-    g = contrastFactor * (g - 128) + 128;
-    b = contrastFactor * (b - 128) + 128;
+        // 2. Contrast
+        r = contrastFactor * (r - 128) + 128;
+        g = contrastFactor * (g - 128) + 128;
+        b = contrastFactor * (b - 128) + 128;
 
-    // 3. Temperature & Tint
-    r *= rTemp;
-    g *= gTint;
-    b *= bTemp;
+        // 3. Temperature & Tint
+        r *= rTemp;
+        g *= gTint;
+        b *= bTemp;
 
-    // 4. Saturation
-    const gray = r * rw + g * rg + b * rb;
-    
-    r = gray + (r - gray) * satMult;
-    g = gray + (g - gray) * satMult;
-    b = gray + (b - gray) * satMult;
+        // 4. Saturation
+        const gray = r * rw + g * rg + b * rb;
 
-    // 5. White Balance (adjusts blue/yellow balance)
-    if (whiteBalance !== 0) {
-      const wbFactor = whiteBalance / 100;
-      // Positive values add blue (cooler), negative values add yellow (warmer)
-      // Adjust blue channel inversely to temperature
-      b *= (1 + wbFactor * 0.3);
-      r *= (1 - wbFactor * 0.15);
-      g *= (1 - wbFactor * 0.1);
+        r = gray + (r - gray) * satMult;
+        g = gray + (g - gray) * satMult;
+        b = gray + (b - gray) * satMult;
+
+        // 5. White Balance (adjusts blue/yellow balance)
+        if (whiteBalance !== 0) {
+            const wbFactor = whiteBalance / 100;
+            // Positive values add blue (cooler), negative values add yellow (warmer)
+            // Adjust blue channel inversely to temperature
+            b *= (1 + wbFactor * 0.3);
+            r *= (1 - wbFactor * 0.15);
+            g *= (1 - wbFactor * 0.1);
+        }
+
+        // 6. Highlights / Shadows (Simple Tone Mapping)
+        const lum = (r + g + b) / 3;
+        if (highlights !== 0 || shadows !== 0) {
+            if (lum > 128 && highlights !== 0) {
+                const factor = 1 + (highlights / 200) * ((lum - 128) / 128);
+                r *= factor;
+                g *= factor;
+                b *= factor;
+            }
+            if (lum < 128 && shadows !== 0) {
+                const factor = 1 + (shadows / 200) * ((128 - lum) / 128);
+                r *= factor;
+                g *= factor;
+                b *= factor;
+            }
+        }
+
+        data[i] = clamp(r);
+        data[i + 1] = clamp(g);
+        data[i + 2] = clamp(b);
     }
-
-    // 6. Highlights / Shadows (Simple Tone Mapping)
-    const lum = (r + g + b) / 3;
-    if (highlights !== 0 || shadows !== 0) {
-       if (lum > 128 && highlights !== 0) {
-           const factor = 1 + (highlights / 200) * ((lum - 128) / 128);
-           r *= factor;
-           g *= factor;
-           b *= factor;
-       }
-       if (lum < 128 && shadows !== 0) {
-           const factor = 1 + (shadows / 200) * ((128 - lum) / 128);
-           r *= factor;
-           g *= factor;
-           b *= factor;
-       }
-    }
-
-    data[i] = clamp(r);
-    data[i + 1] = clamp(g);
-    data[i + 2] = clamp(b);
-  }
 }
 
 export function applyConvolution(
@@ -163,7 +163,7 @@ export function applyConvolution(
     const src = imageData.data;
     const w = imageData.width;
     const h = imageData.height;
-    
+
     const output = new ImageData(w, h);
     const dst = output.data;
 
@@ -188,7 +188,7 @@ export function applyConvolution(
                     }
                 }
             }
-            
+
             dst[dstOff] = clamp(r);
             dst[dstOff + 1] = clamp(g);
             dst[dstOff + 2] = clamp(b);
