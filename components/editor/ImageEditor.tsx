@@ -8,6 +8,14 @@ import { CropTool } from './CropTool';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   RotateCcw,
   Download,
   Undo,
@@ -37,7 +45,8 @@ export function ImageEditor() {
     historyIndex,
     isLoading,
     setPreviewImage,
-    setImage
+    setImage,
+    clearAll
   } = useEditorStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -48,6 +57,7 @@ export function ImageEditor() {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -398,7 +408,36 @@ export function ImageEditor() {
       {/* Top Header / Toolbar */}
       <header className="h-14 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between px-4 shrink-0 z-50">
         <div className="flex items-center gap-4">
-          <span className="font-semibold text-zinc-100">Luma Forge</span>
+          <button
+            onClick={() => {
+              const hasChanges = originalImage && (
+                adjustments.exposure !== 0 ||
+                adjustments.contrast !== 0 ||
+                adjustments.saturation !== 0 ||
+                adjustments.temperature !== 0 ||
+                adjustments.tint !== 0 ||
+                adjustments.highlights !== 0 ||
+                adjustments.shadows !== 0 ||
+                adjustments.sharpness !== 0 ||
+                adjustments.blur !== 0 ||
+                JSON.stringify(adjustments.curves.master) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
+                JSON.stringify(adjustments.curves.red) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
+                JSON.stringify(adjustments.curves.green) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
+                JSON.stringify(adjustments.curves.blue) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
+                (crop.width !== 0 && crop.height !== 0) ||
+                crop.rotation !== 0
+              );
+
+              if (hasChanges) {
+                setShowClearDialog(true);
+              } else {
+                clearAll();
+              }
+            }}
+            className="font-semibold text-zinc-100 hover:text-white transition-colors cursor-pointer"
+          >
+            Luma Forge
+          </button>
           <Separator orientation="vertical" className="h-6 bg-zinc-800" />
           <div className="flex items-center gap-1">
             <Button
@@ -574,6 +613,35 @@ export function ImageEditor() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard all changes?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to discard all changes and start over? This will clear your current image and all adjustments. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowClearDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                clearAll();
+                setShowClearDialog(false);
+              }}
+            >
+              Discard Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

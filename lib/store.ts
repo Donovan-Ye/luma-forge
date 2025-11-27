@@ -52,6 +52,7 @@ interface EditorState {
   redo: () => void;
   reset: () => void;
   setLoading: (loading: boolean) => void;
+  clearAll: () => void; // Clear all data and go back to home
 }
 
 const DEFAULT_CURVES: Curves = {
@@ -347,6 +348,21 @@ export const useEditorStore = create<EditorState>()(
 
       reset: () => {
         set({
+          adjustments: {
+            ...DEFAULT_ADJUSTMENTS,
+            curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
+          },
+          crop: { ...DEFAULT_CROP },
+          history: [],
+          historyIndex: -1,
+        });
+      },
+
+      clearAll: () => {
+        set({
+          originalImage: null,
+          previewImage: null,
+          processedImage: null,
           adjustments: {
             ...DEFAULT_ADJUSTMENTS,
             curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
