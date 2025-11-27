@@ -24,7 +24,9 @@ export async function processImage(
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { 
           willReadFrequently: true, // Optimize for frequent read operations
-          desynchronized: true // Allow async operations
+          desynchronized: true, // Allow async operations
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high' // Use high-quality image smoothing
         });
         
         if (!ctx) {

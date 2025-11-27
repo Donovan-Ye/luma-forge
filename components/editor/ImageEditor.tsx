@@ -328,7 +328,7 @@ export function ImageEditor() {
     };
   }, [isCropping, processedImage]);
 
-  // Generate low-res preview when original image changes
+  // Generate high-quality preview when original image changes
   // Only generate if preview doesn't already exist (to preserve persisted preview)
   useEffect(() => {
     if (!originalImage) return;
@@ -338,17 +338,17 @@ export function ImageEditor() {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX_SIZE = 1000; // Reasonable size for preview
+      // This balances quality and performance
+      const MAX_SIZE = 2048;
       let width = img.width;
       let height = img.height;
 
-      if (width > height) {
-        if (width > MAX_SIZE) {
+      // Only resize if image is larger than MAX_SIZE
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        if (width > height) {
           height *= MAX_SIZE / width;
           width = MAX_SIZE;
-        }
-      } else {
-        if (height > MAX_SIZE) {
+        } else {
           width *= MAX_SIZE / height;
           height = MAX_SIZE;
         }
@@ -356,9 +356,17 @@ export function ImageEditor() {
 
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
-      setPreviewImage(canvas.toDataURL('image/jpeg', 0.8)); // Faster JPEG
+      const ctx = canvas.getContext('2d', {
+        // Use high-quality rendering settings
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      }) as CanvasRenderingContext2D | null;
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        // Use high-quality JPEG (0.95) for good quality while keeping file size reasonable
+        // This is much better than the previous 0.8 quality
+        setPreviewImage(canvas.toDataURL('image/jpeg', 0.95));
+      }
     };
     img.src = originalImage;
   }, [originalImage, previewImage, setPreviewImage]);
