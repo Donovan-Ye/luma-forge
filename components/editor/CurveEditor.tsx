@@ -23,6 +23,8 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
   const [localPoints, setLocalPoints] = useState<Point[] | null>(null);
   const rafRef = useRef<number | null>(null);
   const onChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Mouse position for auxiliary line
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
 
   // Calculate histogram from preview image
   useEffect(() => {
@@ -394,7 +396,68 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         onMouseDown={handleSvgMouseDown}
+        onMouseMove={(e) => {
+          if (!isDragging) {
+            const { x, y } = getCoordinates(e);
+            setMousePosition({ x, y });
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isDragging) {
+            setMousePosition(null);
+          }
+        }}
       >
+        {/* Auxiliary vertical line and intersection point */}
+        {mousePosition && !isDragging && (
+          <>
+            {/* Vertical auxiliary line */}
+            <line
+              x1={mousePosition.x * 100}
+              y1="0"
+              x2={mousePosition.x * 100}
+              y2="100"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+              opacity="0.3"
+              vectorEffect="non-scaling-stroke"
+              className="pointer-events-none"
+            />
+            {/* Intersection point on curve */}
+            {(() => {
+              const curveY = getYOnCurve(mousePosition.x);
+              const cx = mousePosition.x * 100;
+              const cy = (1 - curveY) * 100;
+              return (
+                <g className="pointer-events-none">
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="3"
+                    fill={color}
+                    stroke="white"
+                    strokeWidth="1.5"
+                    opacity="0.9"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="4.5"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="1"
+                    strokeDasharray="1.5 1.5"
+                    opacity="0.6"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
+              );
+            })()}
+          </>
+        )}
+
         {/* Curve Path */}
         <path
           d={pathData}
