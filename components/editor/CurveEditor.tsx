@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { Point } from '@/lib/store';
-import { cn } from '@/lib/utils';
 import { useEditorStore } from '@/lib/store';
 
 interface CurveEditorProps {
@@ -18,6 +17,8 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
   const [isDragging, setIsDragging] = useState(false);
   const previewImage = useEditorStore((state) => state.previewImage);
   const [histogram, setHistogram] = useState<number[]>([]);
+  // Track the original point being dragged to prevent drift after re-sorting
+  const dragStartPointRef = useRef<Point | null>(null);
 
   // Calculate histogram from preview image
   useEffect(() => {
@@ -78,35 +79,22 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     return [...points].sort((a, b) => a.x - b.x);
   }, [points]);
 
-  // Generate smooth curve path using quadratic bezier curves
+  // Generate piecewise linear curve path that passes through all points
+  // This matches the linear interpolation used in createLUT
   const pathData = useMemo(() => {
     if (sortedPoints.length < 2) return '';
 
-    let path = `M ${sortedPoints[0].x * 100} ${(1 - sortedPoints[0].y) * 100}`;
+    // Convert points to SVG coordinates
+    const svgPoints = sortedPoints.map(p => ({
+      x: p.x * 100,
+      y: (1 - p.y) * 100
+    }));
 
-    for (let i = 1; i < sortedPoints.length; i++) {
-      const prev = sortedPoints[i - 1];
-      const curr = sortedPoints[i];
+    // Build path using simple lines - guaranteed to pass through all points
+    let path = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
 
-      if (i === 1) {
-        // First segment: use control point between first two points
-        const cpX = (prev.x + curr.x) / 2 * 100;
-        const cpY = (1 - (prev.y + curr.y) / 2) * 100;
-        path += ` Q ${cpX} ${cpY} ${curr.x * 100} ${(1 - curr.y) * 100}`;
-      } else if (i === sortedPoints.length - 1) {
-        // Last segment: use control point between last two points
-        const cpX = (prev.x + curr.x) / 2 * 100;
-        const cpY = (1 - (prev.y + curr.y) / 2) * 100;
-        path += ` Q ${cpX} ${cpY} ${curr.x * 100} ${(1 - curr.y) * 100}`;
-      } else {
-        // Middle segments: use control points for smooth curves
-        const next = sortedPoints[i + 1];
-        const cpX = curr.x * 100;
-        const cpY = (1 - curr.y) * 100;
-        const endX = (curr.x + next.x) / 2 * 100;
-        const endY = (1 - (curr.y + next.y) / 2) * 100;
-        path += ` Q ${cpX} ${cpY} ${endX} ${endY}`;
-      }
+    for (let i = 1; i < svgPoints.length; i++) {
+      path += ` L ${svgPoints[i].x} ${svgPoints[i].y}`;
     }
 
     return path;
@@ -138,11 +126,40 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     return closestIndex;
   };
 
+  // Calculate Y value on the curve for a given X using linear interpolation
+  const getYOnCurve = (x: number): number => {
+    if (sortedPoints.length < 2) return 0.5;
+
+    // Find the segment that contains this X value
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      const p1 = sortedPoints[i];
+      const p2 = sortedPoints[i + 1];
+
+      if (x >= p1.x && x <= p2.x) {
+        // Linear interpolation
+        const t = (x - p1.x) / (p2.x - p1.x);
+        return p1.y + (p2.y - p1.y) * t;
+      }
+    }
+
+    // If outside bounds, extrapolate
+    if (x < sortedPoints[0].x) {
+      return sortedPoints[0].y;
+    }
+    if (x > sortedPoints[sortedPoints.length - 1].x) {
+      return sortedPoints[sortedPoints.length - 1].y;
+    }
+
+    return 0.5;
+  };
+
   const handlePointMouseDown = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setActivePointIndex(index);
     setIsDragging(true);
+    // Store the original point coordinates to track it through re-sorts
+    dragStartPointRef.current = { ...sortedPoints[index] };
   };
 
   const handleSvgMouseDown = (e: React.MouseEvent) => {
@@ -159,6 +176,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
       // Clicking near existing point, start dragging it
       setActivePointIndex(closestIndex);
       setIsDragging(true);
+      dragStartPointRef.current = { ...sortedPoints[closestIndex] };
       return;
     }
 
@@ -167,6 +185,10 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     if (x <= 0.01 || x >= 0.99) {
       return;
     }
+
+    // Calculate Y value on the curve for this X position
+    // This ensures the point is exactly on the curve line
+    const yOnCurve = getYOnCurve(x);
 
     // Find insertion position
     let insertIndex = sortedPoints.length;
@@ -178,53 +200,73 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     }
 
     const newPoints = [...sortedPoints];
-    newPoints.splice(insertIndex, 0, { x, y });
+    newPoints.splice(insertIndex, 0, { x, y: yOnCurve });
 
     // Update active point index to the newly added point
     setActivePointIndex(insertIndex);
     setIsDragging(true);
+    dragStartPointRef.current = { x, y: yOnCurve };
     onChange(newPoints);
   };
 
   useEffect(() => {
-    if (!isDragging || activePointIndex === null) return;
+    if (!isDragging || activePointIndex === null || !dragStartPointRef.current) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!svgRef.current) return;
+      if (!svgRef.current || !dragStartPointRef.current) return;
 
       const { x, y } = getCoordinates(e);
       const currentPoints = [...sortedPoints];
+      const originalPoint = dragStartPointRef.current;
+
+      // Find the point we're dragging by matching the original coordinates
+      // This is more reliable than using index after re-sorting
+      let targetIndex = currentPoints.findIndex(
+        (p) => Math.abs(p.x - originalPoint.x) < 0.001 && Math.abs(p.y - originalPoint.y) < 0.001
+      );
+
+      // Fallback to activePointIndex if we can't find it
+      if (targetIndex === -1) {
+        targetIndex = activePointIndex;
+      }
 
       // Ensure we have valid points array
-      if (activePointIndex >= currentPoints.length) return;
+      if (targetIndex < 0 || targetIndex >= currentPoints.length) return;
 
       // Constrain X for start/end points
-      if (activePointIndex === 0) {
+      if (targetIndex === 0) {
         currentPoints[0] = { x: 0, y: Math.max(0, Math.min(1, y)) };
-      } else if (activePointIndex === currentPoints.length - 1) {
-        currentPoints[activePointIndex] = { x: 1, y: Math.max(0, Math.min(1, y)) };
+      } else if (targetIndex === currentPoints.length - 1) {
+        currentPoints[targetIndex] = { x: 1, y: Math.max(0, Math.min(1, y)) };
       } else {
         // Constrain X between neighbors
-        const prev = currentPoints[activePointIndex - 1];
-        const next = currentPoints[activePointIndex + 1];
+        const prev = currentPoints[targetIndex - 1];
+        const next = currentPoints[targetIndex + 1];
         const constrainedX = Math.max(prev.x + 0.01, Math.min(next.x - 0.01, x));
-        currentPoints[activePointIndex] = {
+        currentPoints[targetIndex] = {
           x: constrainedX,
           y: Math.max(0, Math.min(1, y))
         };
       }
 
+      // Update the ref with new position before re-sorting
+      dragStartPointRef.current = { ...currentPoints[targetIndex] };
+
       // Re-sort points by x to maintain order
       const reordered = [...currentPoints].sort((a, b) => a.x - b.x);
+
+      // Find the new index after re-sorting by matching the updated point
       const newActiveIndex = reordered.findIndex(
         (p) => {
-          const originalPoint = currentPoints[activePointIndex];
-          return Math.abs(p.x - originalPoint.x) < 0.001 && Math.abs(p.y - originalPoint.y) < 0.001;
+          const updatedPoint = dragStartPointRef.current!;
+          return Math.abs(p.x - updatedPoint.x) < 0.001 && Math.abs(p.y - updatedPoint.y) < 0.001;
         }
       );
 
       if (newActiveIndex >= 0) {
         setActivePointIndex(newActiveIndex);
+        // Update ref to new position after sort
+        dragStartPointRef.current = { ...reordered[newActiveIndex] };
       }
 
       onChange(reordered);
@@ -232,6 +274,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      dragStartPointRef.current = null;
       // Keep activePointIndex for visual feedback
     };
 
@@ -325,24 +368,45 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
         />
 
         {/* Control Points */}
-        {sortedPoints.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x * 100}
-            cy={(1 - p.y) * 100}
-            r="4"
-            fill="white"
-            stroke={color}
-            strokeWidth="2"
-            className={cn(
-              "cursor-pointer hover:scale-125 transition-transform",
-              activePointIndex === i && "scale-125 ring-2 ring-offset-1 ring-offset-background"
-            )}
-            onMouseDown={(e) => handlePointMouseDown(i, e)}
-            onDoubleClick={(e) => handlePointDoubleClick(i, e)}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
+        {sortedPoints.map((p, i) => {
+          const cx = p.x * 100;
+          const cy = (1 - p.y) * 100;
+          const isActive = activePointIndex === i;
+          const scale = isActive ? 1.25 : 1;
+
+          return (
+            <g
+              key={i}
+              transform={`translate(${cx}, ${cy}) scale(${scale})`}
+              className="cursor-pointer transition-transform"
+            >
+              <circle
+                cx="0"
+                cy="0"
+                r="4"
+                fill="white"
+                stroke={color}
+                strokeWidth="2"
+                onMouseDown={(e) => handlePointMouseDown(i, e)}
+                onDoubleClick={(e) => handlePointDoubleClick(i, e)}
+                vectorEffect="non-scaling-stroke"
+              />
+              {isActive && (
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="6"
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.5"
+                  strokeDasharray="2 2"
+                  opacity="0.6"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
