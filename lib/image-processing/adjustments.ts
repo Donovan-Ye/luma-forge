@@ -85,11 +85,13 @@ export function applyColorAdjustments(
   const rw = 0.3086, rg = 0.6094, rb = 0.0820;
 
   // Temperature/Tint adjustment matrices
+  // Temperature: -100 to +100 maps to cool (blue) to warm (yellow/orange)
   const temp = temperature / 100;
   const rTemp = temp > 0 ? 1 + temp * 0.4 : 1;
   const bTemp = temp < 0 ? 1 - temp * 0.4 : 1;
   
-  const tnt = tint / 100;
+  // Tint: -150 to +150 maps to green to magenta
+  const tnt = tint / 150; // Normalize to -1 to +1 range
   const gTint = 1 + tnt * 0.2;
 
 
