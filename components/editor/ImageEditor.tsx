@@ -273,8 +273,11 @@ export function ImageEditor() {
   }, [isCropping, processedImage]);
 
   // Generate low-res preview when original image changes
+  // Only generate if preview doesn't already exist (to preserve persisted preview)
   useEffect(() => {
     if (!originalImage) return;
+    // If previewImage already exists, don't regenerate it (it might be from persistence)
+    if (previewImage) return;
 
     const img = new Image();
     img.onload = () => {
@@ -302,7 +305,7 @@ export function ImageEditor() {
       setPreviewImage(canvas.toDataURL('image/jpeg', 0.8)); // Faster JPEG
     };
     img.src = originalImage;
-  }, [originalImage, setPreviewImage]);
+  }, [originalImage, previewImage, setPreviewImage]);
 
   // Handle image processing when adjustments/crop change
   // Uses previewImage for performance
