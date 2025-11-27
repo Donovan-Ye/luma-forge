@@ -432,10 +432,10 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
               <circle
                 cx="0"
                 cy="0"
-                r="4"
+                r="2"
                 fill="white"
                 stroke={color}
-                strokeWidth="2"
+                strokeWidth="1.5"
                 onMouseDown={(e) => handlePointMouseDown(i, e)}
                 onDoubleClick={(e) => handlePointDoubleClick(i, e)}
                 vectorEffect="non-scaling-stroke"
@@ -444,10 +444,10 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
                 <circle
                   cx="0"
                   cy="0"
-                  r="6"
+                  r="3.5"
                   fill="none"
                   stroke={color}
-                  strokeWidth="1.5"
+                  strokeWidth="1"
                   strokeDasharray="2 2"
                   opacity="0.6"
                   vectorEffect="non-scaling-stroke"
