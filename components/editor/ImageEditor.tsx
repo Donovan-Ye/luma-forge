@@ -5,6 +5,8 @@ import { useEditorStore } from '@/lib/store';
 import { ImageUpload } from '@/components/upload/ImageUpload';
 import { AdjustmentsPanel } from './AdjustmentsPanel';
 import { CropTool } from './CropTool';
+import { Histogram } from './Histogram';
+import { ImageMetadata } from './ImageMetadata';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -598,6 +600,14 @@ export function ImageEditor() {
 
         {/* Right Sidebar - Adjustments */}
         <div className="w-[320px] border-l border-zinc-800 bg-background flex flex-col shrink-0 z-30 shadow-xl">
+          {/* Histogram and Metadata */}
+          {originalImage && (
+            <>
+              <Histogram imageSrc={processedImage || originalImage} />
+              <ImageMetadata imageSrc={originalImage} />
+            </>
+          )}
+
           <div className="p-4 border-b border-zinc-800">
             <Button
               variant="secondary"

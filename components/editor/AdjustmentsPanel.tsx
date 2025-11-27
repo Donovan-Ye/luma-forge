@@ -162,15 +162,13 @@ export function AdjustmentsPanel() {
               onChange={handleChange('temperature')}
               min={-100}
               max={100}
-              gradient="linear-gradient(to right, #3b82f6 0%, #ffffff 50%, #fbbf24 100%)"
             />
             <AdjustmentSlider
               label="Tint"
               value={adjustments.tint}
               onChange={handleChange('tint')}
-              min={-150}
-              max={150}
-              gradient="linear-gradient(to right, #22c55e 0%, #ffffff 50%, #a855f7 100%)"
+              min={-100}
+              max={100}
             />
             <AdjustmentSlider
               label="White Balance"
@@ -338,10 +336,9 @@ interface AdjustmentSliderProps {
   onChange: (value: number[]) => void;
   min: number;
   max: number;
-  gradient?: string; // CSS gradient for the track
 }
 
-function AdjustmentSlider({ label, value, onChange, min, max, gradient }: AdjustmentSliderProps) {
+function AdjustmentSlider({ label, value, onChange, min, max }: AdjustmentSliderProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
@@ -350,24 +347,14 @@ function AdjustmentSlider({ label, value, onChange, min, max, gradient }: Adjust
           {value}
         </span>
       </div>
-      <div className="relative h-1.5">
-        {gradient && (
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none z-0"
-            style={{ background: gradient }}
-          />
-        )}
-        <div className={cn("relative z-10", gradient && "[&_[data-slot=slider-track]]:bg-transparent [&_[data-slot=slider-range]]:bg-transparent")}>
-          <Slider
-            value={[value]}
-            onValueChange={onChange}
-            min={min}
-            max={max}
-            step={1}
-            className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
-          />
-        </div>
-      </div>
+      <Slider
+        value={[value]}
+        onValueChange={onChange}
+        min={min}
+        max={max}
+        step={1}
+        className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3"
+      />
     </div>
   );
 }

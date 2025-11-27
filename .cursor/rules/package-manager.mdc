@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+We use pnpm as our package manager.
