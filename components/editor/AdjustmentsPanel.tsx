@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEditorStore, ImageAdjustments, Point } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -346,6 +346,8 @@ function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: A
   // Local state for smooth dragging
   const [localValue, setLocalValue] = useState(value);
   const isDraggingRef = useRef(false);
+  const lastCommittedValueRef = useRef(value);
+  const debouncedPendingRef = useRef(false);
 
   // Sync local value when prop value changes (but not during drag)
   useEffect(() => {
@@ -354,39 +356,47 @@ function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: A
       requestAnimationFrame(() => {
         if (!isDraggingRef.current) {
           setLocalValue(value);
+          lastCommittedValueRef.current = value;
         }
       });
     }
   }, [value]);
 
   // Create debounced function using lodash
-  const debouncedUpdate = useMemo(
-    () => debounce((newValue: number) => {
-      onChange([newValue]);
-    }, 50), // 50ms debounce for smooth updates
-    [onChange]
-  );
+  const debouncedUpdateRef = useRef<ReturnType<typeof debounce> | null>(null);
 
-  // Cleanup debounced function on unmount
   useEffect(() => {
+    debouncedUpdateRef.current = debounce((newValue: number) => {
+      onChange([newValue]);
+      lastCommittedValueRef.current = newValue;
+      debouncedPendingRef.current = false;
+    }, 50); // 50ms debounce for smooth updates
+
     return () => {
-      debouncedUpdate.cancel();
+      debouncedUpdateRef.current?.cancel();
     };
-  }, [debouncedUpdate]);
+  }, [onChange]);
 
   const handleValueChange = useCallback((newValue: number[]) => {
     const val = newValue[0];
     setLocalValue(val); // Update local state immediately for smooth UI
-    debouncedUpdate(val); // Debounced update to store
-  }, [debouncedUpdate]);
+    debouncedPendingRef.current = true;
+    debouncedUpdateRef.current?.(val); // Debounced update to store
+  }, []);
 
   const handleValueCommit = useCallback(() => {
-    // Cancel any pending debounced update and flush immediately
-    debouncedUpdate.cancel();
-    // Immediately commit the current value
-    onChange([localValue]);
+    // Cancel any pending debounced update
+    debouncedUpdateRef.current?.cancel();
+
+    // Only commit if the value changed and debounced update hasn't already fired
+    if (localValue !== lastCommittedValueRef.current) {
+      onChange([localValue]);
+      lastCommittedValueRef.current = localValue;
+    }
+
+    debouncedPendingRef.current = false;
     isDraggingRef.current = false;
-  }, [localValue, onChange, debouncedUpdate]);
+  }, [localValue, onChange]);
 
   const handlePointerDown = useCallback(() => {
     isDraggingRef.current = true;

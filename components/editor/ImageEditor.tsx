@@ -102,6 +102,49 @@ export function ImageEditor() {
     };
   }, [showOriginal]);
 
+  // Handle keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input/textarea/contenteditable
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Check for Cmd (Mac) or Ctrl (Windows/Linux)
+      const isModifierPressed = e.metaKey || e.ctrlKey;
+
+      // Undo: Cmd/Ctrl + Z (without Shift)
+      if (isModifierPressed && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          undo();
+        }
+      }
+
+      // Redo: Cmd/Ctrl + Shift + Z (or Cmd/Ctrl + Y on Windows/Linux)
+      if (
+        isModifierPressed &&
+        ((e.shiftKey && e.key === 'z') || e.key === 'y')
+      ) {
+        e.preventDefault();
+        if (canRedo) {
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canUndo, canRedo, undo, redo]);
+
   // Reset pan when zoom resets to 1x
   useEffect(() => {
     if (zoomLevel === 1) {
