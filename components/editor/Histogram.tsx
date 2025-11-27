@@ -96,14 +96,62 @@ export function Histogram({ imageSrc }: HistogramProps) {
     return `M ${points.join(' L ')}`;
   };
 
+  // Generate filled path (closed area under the curve)
+  const generateFilledPath = (values: number[]): string => {
+    const points = values.map((value, index) => {
+      const x = index;
+      const y = 100 - (value * 100);
+      return `${x} ${y}`;
+    });
+    // Close the path: curve -> bottom right -> bottom left -> start
+    return `M ${points.join(' L ')} L 255 100 L 0 100 Z`;
+  };
+
   const redPath = generatePath(histogram.red);
   const greenPath = generatePath(histogram.green);
   const bluePath = generatePath(histogram.blue);
 
+  const redFilledPath = generateFilledPath(histogram.red);
+  const greenFilledPath = generateFilledPath(histogram.green);
+  const blueFilledPath = generateFilledPath(histogram.blue);
+
   return (
     <div className="h-32 bg-black border-b border-zinc-800 relative overflow-hidden">
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 256 100" preserveAspectRatio="none">
-        {/* Blue channel */}
+        <defs>
+          {/* Gradients for filled areas */}
+          <linearGradient id="blueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+          </linearGradient>
+          <linearGradient id="greenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
+          </linearGradient>
+          <linearGradient id="redGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#ef4444" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#ef4444" stopOpacity="0.05" />
+          </linearGradient>
+        </defs>
+
+        {/* Filled areas under curves (rendered first, so lines appear on top) */}
+        <path
+          d={blueFilledPath}
+          fill="url(#blueGradient)"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d={greenFilledPath}
+          fill="url(#greenGradient)"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d={redFilledPath}
+          fill="url(#redGradient)"
+          vectorEffect="non-scaling-stroke"
+        />
+
+        {/* Curve lines (rendered on top) */}
         <path
           d={bluePath}
           fill="none"
@@ -112,7 +160,6 @@ export function Histogram({ imageSrc }: HistogramProps) {
           opacity="0.7"
           vectorEffect="non-scaling-stroke"
         />
-        {/* Green channel */}
         <path
           d={greenPath}
           fill="none"
@@ -121,7 +168,6 @@ export function Histogram({ imageSrc }: HistogramProps) {
           opacity="0.7"
           vectorEffect="non-scaling-stroke"
         />
-        {/* Red channel */}
         <path
           d={redPath}
           fill="none"

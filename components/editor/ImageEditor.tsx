@@ -602,10 +602,10 @@ export function ImageEditor() {
         <div className="w-[320px] border-l border-zinc-800 bg-background flex flex-col shrink-0 z-30 shadow-xl">
           {/* Histogram and Metadata */}
           {originalImage && (
-            <>
+            <div className="flex flex-col gap-2 p-4">
               <Histogram imageSrc={processedImage || originalImage} />
               <ImageMetadata imageSrc={originalImage} />
-            </>
+            </div>
           )}
 
           <div className="p-4 border-b border-zinc-800">
