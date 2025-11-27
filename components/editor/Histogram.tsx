@@ -55,16 +55,59 @@ export function Histogram({ imageSrc }: HistogramProps) {
         blueHist[data[i + 2]]++;
       }
 
+      // Smooth histogram using Gaussian blur to reduce sawtooth artifacts from quantization
+      const smoothHistogram = (hist: number[], sigma: number = 3): number[] => {
+        const smoothed = new Array(256).fill(0);
+
+        // Generate Gaussian kernel
+        const kernelSize = Math.ceil(sigma * 3) * 2 + 1; // Ensure odd size
+        const kernel: number[] = [];
+        let kernelSum = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+          const x = i - Math.floor(kernelSize / 2);
+          const value = Math.exp(-(x * x) / (2 * sigma * sigma));
+          kernel.push(value);
+          kernelSum += value;
+        }
+
+        // Normalize kernel
+        for (let i = 0; i < kernel.length; i++) {
+          kernel[i] /= kernelSum;
+        }
+
+        // Apply Gaussian blur
+        for (let i = 0; i < 256; i++) {
+          let sum = 0;
+          const halfKernel = Math.floor(kernelSize / 2);
+
+          for (let j = 0; j < kernelSize; j++) {
+            const idx = i - halfKernel + j;
+            if (idx >= 0 && idx < 256) {
+              sum += hist[idx] * kernel[j];
+            }
+          }
+
+          smoothed[i] = sum;
+        }
+
+        return smoothed;
+      };
+
+      const smoothedRed = smoothHistogram(redHist);
+      const smoothedGreen = smoothHistogram(greenHist);
+      const smoothedBlue = smoothHistogram(blueHist);
+
       // Normalize histograms to 0-1 range
-      const maxRed = Math.max(...redHist);
-      const maxGreen = Math.max(...greenHist);
-      const maxBlue = Math.max(...blueHist);
+      const maxRed = Math.max(...smoothedRed);
+      const maxGreen = Math.max(...smoothedGreen);
+      const maxBlue = Math.max(...smoothedBlue);
       const max = Math.max(maxRed, maxGreen, maxBlue);
 
       const normalized = {
-        red: redHist.map((v) => (max > 0 ? v / max : 0)),
-        green: greenHist.map((v) => (max > 0 ? v / max : 0)),
-        blue: blueHist.map((v) => (max > 0 ? v / max : 0)),
+        red: smoothedRed.map((v) => (max > 0 ? v / max : 0)),
+        green: smoothedGreen.map((v) => (max > 0 ? v / max : 0)),
+        blue: smoothedBlue.map((v) => (max > 0 ? v / max : 0)),
       };
 
       if (!cancelled && currentImageSrcRef.current === imageSrc) {
@@ -87,6 +130,7 @@ export function Histogram({ imageSrc }: HistogramProps) {
   }
 
   // Generate path data for line charts
+  // Data is already smoothed, so straight lines will appear smooth
   const generatePath = (values: number[]): string => {
     const points = values.map((value, index) => {
       const x = index;
