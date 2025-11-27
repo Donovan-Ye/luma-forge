@@ -9,9 +9,9 @@ import {
   AccordionItem,
   AccordionTrigger
 } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sun, Spline, Sparkles, Aperture } from 'lucide-react';
 import { CurveEditor } from './CurveEditor';
+import { cn } from '@/lib/utils';
 
 export function AdjustmentsPanel() {
   const { adjustments, updateAdjustments } = useEditorStore();
@@ -149,20 +149,57 @@ export function AdjustmentsPanel() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pt-2 space-y-4">
-            <Select
-              value={activeCurve}
-              onValueChange={(v: 'master' | 'red' | 'green' | 'blue') => setActiveCurve(v)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="master">Master (RGB)</SelectItem>
-                <SelectItem value="red">Red Channel</SelectItem>
-                <SelectItem value="green">Green Channel</SelectItem>
-                <SelectItem value="blue">Blue Channel</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Channel Selector Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveCurve('master')}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
+                  activeCurve === 'master'
+                    ? "border-foreground bg-foreground/10 scale-110"
+                    : "border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/50"
+                )}
+                title="Master (RGB)"
+              >
+                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-white via-gray-400 to-black" />
+              </button>
+              <button
+                onClick={() => setActiveCurve('red')}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
+                  activeCurve === 'red'
+                    ? "border-red-500 bg-red-500/10 scale-110"
+                    : "border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10"
+                )}
+                title="Red Channel"
+              >
+                <div className="w-4 h-4 rounded-full bg-red-500" />
+              </button>
+              <button
+                onClick={() => setActiveCurve('green')}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
+                  activeCurve === 'green'
+                    ? "border-green-500 bg-green-500/10 scale-110"
+                    : "border-green-500/30 hover:border-green-500/50 hover:bg-green-500/10"
+                )}
+                title="Green Channel"
+              >
+                <div className="w-4 h-4 rounded-full bg-green-500" />
+              </button>
+              <button
+                onClick={() => setActiveCurve('blue')}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
+                  activeCurve === 'blue'
+                    ? "border-blue-500 bg-blue-500/10 scale-110"
+                    : "border-blue-500/30 hover:border-blue-500/50 hover:bg-blue-500/10"
+                )}
+                title="Blue Channel"
+              >
+                <div className="w-4 h-4 rounded-full bg-blue-500" />
+              </button>
+            </div>
 
             <div className="pt-2 pb-2">
               {adjustments.curves && (
@@ -170,6 +207,7 @@ export function AdjustmentsPanel() {
                   points={adjustments.curves[activeCurve]}
                   onChange={handleCurveChange}
                   color={curveColors[activeCurve]}
+                  channel={activeCurve}
                 />
               )}
             </div>
