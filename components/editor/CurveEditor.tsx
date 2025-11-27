@@ -87,8 +87,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     return [...pointsToUse].sort((a, b) => a.x - b.x);
   }, [points, localPoints]);
 
-  // Generate piecewise linear curve path that passes through all points
-  // This matches the linear interpolation used in createLUT
+  // Generate smooth cubic Bezier curve path using Catmull-Rom spline conversion
   const pathData = useMemo(() => {
     if (sortedPoints.length < 2) return '';
 
@@ -98,11 +97,55 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
       y: (1 - p.y) * 100
     }));
 
-    // Build path using simple lines - guaranteed to pass through all points
+    if (svgPoints.length === 2) {
+      // For 2 points, use a simple line
+      return `M ${svgPoints[0].x} ${svgPoints[0].y} L ${svgPoints[1].x} ${svgPoints[1].y}`;
+    }
+
+    // Convert Catmull-Rom spline to cubic Bezier curves
+    // This ensures C1 continuity (smooth first derivative) at all points
+
+    // Helper to get point with boundary handling
+    const getPoint = (index: number) => {
+      if (index < 0) {
+        // Extrapolate backwards
+        const p0 = svgPoints[0];
+        const p1 = svgPoints[1];
+        return {
+          x: p0.x - (p1.x - p0.x),
+          y: p0.y - (p1.y - p0.y)
+        };
+      }
+      if (index >= svgPoints.length) {
+        // Extrapolate forwards
+        const pn1 = svgPoints[svgPoints.length - 2];
+        const pn = svgPoints[svgPoints.length - 1];
+        return {
+          x: pn.x + (pn.x - pn1.x),
+          y: pn.y + (pn.y - pn1.y)
+        };
+      }
+      return svgPoints[index];
+    };
+
+    // Build path using cubic Bezier curves
     let path = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
 
-    for (let i = 1; i < svgPoints.length; i++) {
-      path += ` L ${svgPoints[i].x} ${svgPoints[i].y}`;
+    for (let i = 0; i < svgPoints.length - 1; i++) {
+      const p0 = getPoint(i - 1);
+      const p1 = svgPoints[i];      // Start point
+      const p2 = svgPoints[i + 1];  // End point
+      const p3 = getPoint(i + 2);
+
+      // Convert Catmull-Rom to Bezier control points
+      // Formula: CP1 = P1 + (P2 - P0) / 6, CP2 = P2 - (P3 - P1) / 6
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      // Use cubic Bezier curve
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
     }
 
     return path;
@@ -134,7 +177,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
     return closestIndex;
   };
 
-  // Calculate Y value on the curve for a given X using linear interpolation
+  // Calculate Y value on the smooth curve for a given X using cubic Bezier interpolation
   const getYOnCurve = (x: number): number => {
     if (sortedPoints.length < 2) return 0.5;
 
@@ -144,9 +187,84 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
       const p2 = sortedPoints[i + 1];
 
       if (x >= p1.x && x <= p2.x) {
-        // Linear interpolation
-        const t = (x - p1.x) / (p2.x - p1.x);
-        return p1.y + (p2.y - p1.y) * t;
+        // Get neighboring points for Catmull-Rom control points (same as path generation)
+        const getPoint = (index: number) => {
+          if (index < 0) {
+            const p0 = sortedPoints[0];
+            const p1 = sortedPoints[1];
+            return { x: p0.x - (p1.x - p0.x), y: p0.y - (p1.y - p0.y) };
+          }
+          if (index >= sortedPoints.length) {
+            const pn1 = sortedPoints[sortedPoints.length - 2];
+            const pn = sortedPoints[sortedPoints.length - 1];
+            return { x: pn.x + (pn.x - pn1.x), y: pn.y + (pn.y - pn1.y) };
+          }
+          return sortedPoints[index];
+        };
+
+        const p0 = getPoint(i - 1);
+        const p3 = getPoint(i + 2);
+
+        // Calculate control points using Catmull-Rom to Bezier conversion
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        // Solve for t using Newton-Raphson method
+        let t = (x - p1.x) / (p2.x - p1.x); // Initial guess: linear interpolation
+        t = Math.max(0, Math.min(1, t));
+
+        let iterations = 0;
+        const maxIterations = 30;
+        const tolerance = 0.00001;
+
+        while (iterations < maxIterations) {
+          // Calculate x position at t
+          const mt = 1 - t;
+          const mt2 = mt * mt;
+          const mt3 = mt2 * mt;
+          const t2 = t * t;
+          const t3 = t2 * t;
+
+          const bx = mt3 * p1.x +
+            3 * mt2 * t * cp1x +
+            3 * mt * t2 * cp2x +
+            t3 * p2.x;
+
+          const error = bx - x;
+          if (Math.abs(error) < tolerance) break;
+
+          // Calculate derivative (for Newton-Raphson)
+          const derivative = 3 * mt2 * (cp1x - p1.x) +
+            6 * mt * t * (cp2x - cp1x) +
+            3 * t2 * (p2.x - cp2x);
+
+          if (Math.abs(derivative) > 0.00001) {
+            t = t - error / derivative;
+            t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
+          } else {
+            // Fallback to linear if derivative is too small
+            t = (x - p1.x) / (p2.x - p1.x);
+            break;
+          }
+
+          iterations++;
+        }
+
+        // Calculate y at the found t
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const mt3 = mt2 * mt;
+        const t2 = t * t;
+        const t3 = t2 * t;
+
+        const y = mt3 * p1.y +
+          3 * mt2 * t * cp1y +
+          3 * mt * t2 * cp2y +
+          t3 * p2.y;
+
+        return y;
       }
     }
 
