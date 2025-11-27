@@ -18,6 +18,7 @@ export interface ImageAdjustments {
   tint: number;
   highlights: number;
   shadows: number;
+  whiteBalance: number;
   sharpness: number;
   blur: number;
   curves: Curves;
@@ -70,6 +71,7 @@ const DEFAULT_ADJUSTMENTS: ImageAdjustments = {
   tint: 0,
   highlights: 0,
   shadows: 0,
+  whiteBalance: 0,
   sharpness: 0,
   blur: 0,
   curves: JSON.parse(JSON.stringify(DEFAULT_CURVES)), // Deep copy

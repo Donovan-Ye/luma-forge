@@ -418,6 +418,7 @@ export function ImageEditor() {
                 adjustments.tint !== 0 ||
                 adjustments.highlights !== 0 ||
                 adjustments.shadows !== 0 ||
+                adjustments.whiteBalance !== 0 ||
                 adjustments.sharpness !== 0 ||
                 adjustments.blur !== 0 ||
                 JSON.stringify(adjustments.curves.master) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||

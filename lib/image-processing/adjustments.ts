@@ -73,6 +73,7 @@ export function applyColorAdjustments(
     tint,
     highlights,
     shadows,
+    whiteBalance,
   } = adjustments;
 
   // Pre-calculate constants
@@ -119,7 +120,17 @@ export function applyColorAdjustments(
     g = gray + (g - gray) * satMult;
     b = gray + (b - gray) * satMult;
 
-    // 5. Highlights / Shadows (Simple Tone Mapping)
+    // 5. White Balance (adjusts blue/yellow balance)
+    if (whiteBalance !== 0) {
+      const wbFactor = whiteBalance / 100;
+      // Positive values add blue (cooler), negative values add yellow (warmer)
+      // Adjust blue channel inversely to temperature
+      b *= (1 + wbFactor * 0.3);
+      r *= (1 - wbFactor * 0.15);
+      g *= (1 - wbFactor * 0.1);
+    }
+
+    // 6. Highlights / Shadows (Simple Tone Mapping)
     const lum = (r + g + b) / 3;
     if (highlights !== 0 || shadows !== 0) {
        if (lum > 128 && highlights !== 0) {

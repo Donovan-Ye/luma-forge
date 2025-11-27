@@ -9,7 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger
 } from '@/components/ui/accordion';
-import { Sun, Spline, Sparkles, Aperture, RotateCcw } from 'lucide-react';
+import { Sun, Spline, Sparkles, Aperture, RotateCcw, Droplet } from 'lucide-react';
 import { CurveEditor } from './CurveEditor';
 import { cn } from '@/lib/utils';
 
@@ -48,12 +48,19 @@ export function AdjustmentsPanel() {
     });
   };
 
+  const resetWhiteBalance = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    updateAdjustments({
+      temperature: 0,
+      tint: 0,
+      whiteBalance: 0,
+    });
+  };
+
   const resetColor = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent accordion toggle
     updateAdjustments({
       saturation: 0,
-      temperature: 0,
-      tint: 0,
     });
   };
 
@@ -80,7 +87,7 @@ export function AdjustmentsPanel() {
 
   return (
     <div className="w-full h-full">
-      <Accordion type="multiple" defaultValue={["light", "color", "detail"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["light", "whiteBalance", "color", "detail"]} className="w-full">
 
         {/* Light Section */}
         <AccordionItem value="light">
@@ -131,6 +138,48 @@ export function AdjustmentsPanel() {
           </AccordionContent>
         </AccordionItem>
 
+        {/* White Balance Section */}
+        <AccordionItem value="whiteBalance">
+          <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
+            <div className="flex items-center justify-between w-full pr-2">
+              <div className="flex items-center gap-2">
+                <Droplet className="w-4 h-4 text-muted-foreground" />
+                <span>White Balance</span>
+              </div>
+              <button
+                onClick={resetWhiteBalance}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-accent transition-colors"
+                title="Reset White Balance adjustments"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pt-2 space-y-6">
+            <AdjustmentSlider
+              label="Temperature"
+              value={adjustments.temperature}
+              onChange={handleChange('temperature')}
+              min={-100}
+              max={100}
+            />
+            <AdjustmentSlider
+              label="Tint"
+              value={adjustments.tint}
+              onChange={handleChange('tint')}
+              min={-100}
+              max={100}
+            />
+            <AdjustmentSlider
+              label="White Balance"
+              value={adjustments.whiteBalance}
+              onChange={handleChange('whiteBalance')}
+              min={-100}
+              max={100}
+            />
+          </AccordionContent>
+        </AccordionItem>
+
         {/* Color Section */}
         <AccordionItem value="color">
           <AccordionTrigger className="px-4 hover:no-underline hover:bg-accent/50">
@@ -153,20 +202,6 @@ export function AdjustmentsPanel() {
               label="Saturation"
               value={adjustments.saturation}
               onChange={handleChange('saturation')}
-              min={-100}
-              max={100}
-            />
-            <AdjustmentSlider
-              label="Temperature"
-              value={adjustments.temperature}
-              onChange={handleChange('temperature')}
-              min={-100}
-              max={100}
-            />
-            <AdjustmentSlider
-              label="Tint"
-              value={adjustments.tint}
-              onChange={handleChange('tint')}
               min={-100}
               max={100}
             />
