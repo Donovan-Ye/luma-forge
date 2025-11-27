@@ -63,6 +63,7 @@ export function ImageEditor() {
   const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const originalImageRef = useRef<HTMLImageElement | null>(null);
 
   // Determine if undo/redo should be enabled
   const canUndo = historyIndex >= 0;
@@ -327,6 +328,60 @@ export function ImageEditor() {
       window.removeEventListener('wheel', handleWheel);
     };
   }, [isCropping, processedImage]);
+
+  // Preload and decode original image for fast "show original" display
+  useEffect(() => {
+    if (!originalImage) {
+      originalImageRef.current = null;
+      return;
+    }
+
+    // Preload the original image in the background using requestIdleCallback
+    // to avoid blocking the main thread
+    const preloadImage = () => {
+      const img = new Image();
+
+      img.onload = async () => {
+        try {
+          // Use decode() API if available for better performance
+          if (img.decode) {
+            await img.decode();
+          }
+
+          // Force image decoding by drawing to offscreen canvas
+          // This ensures the image is fully decoded and ready for instant display
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            // Force decode by reading pixel data (small operation)
+            ctx.getImageData(0, 0, 1, 1);
+          }
+
+          originalImageRef.current = img;
+        } catch {
+          // If decode fails, still cache the image
+          originalImageRef.current = img;
+        }
+      };
+
+      img.onerror = () => {
+        originalImageRef.current = null;
+      };
+
+      img.src = originalImage;
+    };
+
+    // Use requestIdleCallback to preload when browser is idle
+    // Fallback to setTimeout if not available
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(preloadImage, { timeout: 2000 });
+    } else {
+      setTimeout(preloadImage, 100);
+    }
+  }, [originalImage]);
 
   // Generate high-quality preview when original image changes
   // Only generate if preview doesn't already exist (to preserve persisted preview)
@@ -607,9 +662,13 @@ export function ImageEditor() {
                 style={{
                   transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel})`,
                   transition: zoomLevel === 1 && !isDragging ? 'transform 0.2s' : 'none',
-                  transformOrigin: 'center center'
+                  transformOrigin: 'center center',
+                  // Use will-change for better performance
+                  willChange: 'transform'
                 }}
                 draggable={false}
+                loading="eager"
+                decoding="async"
               />
             ) : processedImage ? (
               // eslint-disable-next-line @next/next/no-img-element
