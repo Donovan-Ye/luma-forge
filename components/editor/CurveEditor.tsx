@@ -298,7 +298,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
 
     const { x, y } = getCoordinates(e);
 
-    // Check if clicking near an existing point
+    // Check if clicking near an existing point (by distance)
     const closestIndex = findClosestPointOnCurve(x, y);
     if (closestIndex >= 0) {
       // Clicking near existing point, start dragging it
@@ -307,6 +307,43 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
       dragStartPointRef.current = { ...sortedPoints[closestIndex] };
       // Initialize local points for immediate visual feedback
       setLocalPoints([...sortedPoints]);
+      return;
+    }
+
+    // Check if there's a point with similar X coordinate (within 3% threshold)
+    // If so, move that point to the click position instead of adding a new one
+    const X_THRESHOLD = 0.03; // 3% threshold
+    let nearbyPointIndex = -1;
+    let minXDist = Infinity;
+
+    for (let i = 0; i < sortedPoints.length; i++) {
+      const xDist = Math.abs(sortedPoints[i].x - x);
+      if (xDist < X_THRESHOLD && xDist < minXDist) {
+        minXDist = xDist;
+        nearbyPointIndex = i;
+      }
+    }
+
+    if (nearbyPointIndex >= 0) {
+      // Move the nearby point to the click position
+      // Calculate Y value on the curve for this X position
+      const yOnCurve = getYOnCurve(x);
+
+      const newPoints = [...sortedPoints];
+      newPoints[nearbyPointIndex] = { x, y: yOnCurve };
+
+      // Re-sort points by X to maintain order
+      const reordered = newPoints.sort((a, b) => a.x - b.x);
+
+      // Find the new index after re-sorting
+      const newIndex = reordered.findIndex(
+        (p) => Math.abs(p.x - x) < 0.001 && Math.abs(p.y - yOnCurve) < 0.001
+      );
+
+      setActivePointIndex(newIndex >= 0 ? newIndex : nearbyPointIndex);
+      setIsDragging(true);
+      dragStartPointRef.current = { x, y: yOnCurve };
+      onChange(reordered);
       return;
     }
 
