@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface ImageMetadataProps {
   imageSrc: string | null;
@@ -13,12 +13,26 @@ interface Metadata {
   focalLength?: string;
 }
 
+interface ExifData {
+  ISO?: number;
+  FNumber?: number;
+  ExposureTime?: number;
+  FocalLength?: number;
+}
+
 export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
   const [metadata, setMetadata] = useState<Metadata & { fileFormat?: string }>({});
+  const currentImageSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
+    currentImageSrcRef.current = imageSrc;
+
     if (!imageSrc) {
-      setMetadata({});
+      requestAnimationFrame(() => {
+        if (currentImageSrcRef.current === null) {
+          setMetadata({});
+        }
+      });
       return;
     }
 
@@ -33,46 +47,50 @@ export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
     }
 
     // Load EXIF library dynamically
-    import('exif-js').then((EXIF) => {
-      const img = new Image();
-      img.onload = () => {
-        EXIF.getData(img as any, function() {
-          const iso = EXIF.getTag(this, 'ISO');
-          const fNumber = EXIF.getTag(this, 'FNumber');
-          const exposureTime = EXIF.getTag(this, 'ExposureTime');
-          const focalLength = EXIF.getTag(this, 'FocalLength');
+    import('exifr').then((exifr) => {
+      // Parse EXIF data from the image
+      exifr.parse(imageSrc, {
+        pick: ['ISO', 'FNumber', 'ExposureTime', 'FocalLength']
+      }).then((exifData: ExifData | null) => {
+        if (currentImageSrcRef.current !== imageSrc) return;
 
-          const result: Metadata & { fileFormat: string } = { fileFormat };
+        const result: Metadata & { fileFormat: string } = { fileFormat };
 
-          if (iso) {
-            result.iso = iso;
+        if (exifData?.ISO) {
+          result.iso = exifData.ISO;
+        }
+
+        if (exifData?.FNumber) {
+          const apertureValue = exifData.FNumber;
+          result.aperture = `F/${apertureValue.toFixed(1)}`;
+        }
+
+        if (exifData?.ExposureTime) {
+          const exposureTime = exifData.ExposureTime;
+          if (exposureTime < 1) {
+            const denominator = Math.round(1 / exposureTime);
+            result.shutterSpeed = `1/${denominator}秒`;
+          } else {
+            result.shutterSpeed = `${exposureTime.toFixed(1)}秒`;
           }
+        }
 
-          if (fNumber) {
-            const apertureValue = fNumber;
-            result.aperture = `F/${apertureValue.toFixed(1)}`;
-          }
+        if (exifData?.FocalLength) {
+          result.focalLength = `${Math.round(exifData.FocalLength)}mm`;
+        }
 
-          if (exposureTime) {
-            if (exposureTime < 1) {
-              const denominator = Math.round(1 / exposureTime);
-              result.shutterSpeed = `1/${denominator}秒`;
-            } else {
-              result.shutterSpeed = `${exposureTime.toFixed(1)}秒`;
-            }
-          }
-
-          if (focalLength) {
-            result.focalLength = `${Math.round(focalLength)}mm`;
-          }
-
-          setMetadata(result);
-        });
-      };
-      img.src = imageSrc;
+        setMetadata(result);
+      }).catch(() => {
+        // EXIF library failed to load or no EXIF data
+        if (currentImageSrcRef.current === imageSrc) {
+          setMetadata({ fileFormat });
+        }
+      });
     }).catch(() => {
-      // EXIF library failed to load or no EXIF data
-      setMetadata({ fileFormat });
+      // Library failed to load
+      if (currentImageSrcRef.current === imageSrc) {
+        setMetadata({ fileFormat });
+      }
     });
   }, [imageSrc]);
 
@@ -85,7 +103,7 @@ export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
         {metadata.shutterSpeed && <span>{metadata.shutterSpeed}</span>}
       </div>
       {metadata.fileFormat && (
-        <span className="text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">
+        <span className="bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">
           {metadata.fileFormat}
         </span>
       )}
