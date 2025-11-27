@@ -394,7 +394,7 @@ export function ImageEditor() {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       // This balances quality and performance
-      const MAX_SIZE = 2048;
+      const MAX_SIZE = 1536;
       let width = img.width;
       let height = img.height;
 
