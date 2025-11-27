@@ -42,6 +42,7 @@ interface EditorState {
 
   history: { adjustments: ImageAdjustments; crop: CropState }[];
   historyIndex: number;
+  isLoading: boolean; // Loading state for IndexedDB operations
 
   setImage: (imageData: string) => void;
   setPreviewImage: (imageData: string) => void;
@@ -50,6 +51,7 @@ interface EditorState {
   undo: () => void;
   redo: () => void;
   reset: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 const DEFAULT_CURVES: Curves = {
@@ -129,7 +131,9 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
       try {
         // Get settings from localStorage
         const settingsStr = localStorage.getItem(SETTINGS_KEY);
-        if (!settingsStr) return null;
+        if (!settingsStr) {
+          return null;
+        }
 
         const settings = JSON.parse(settingsStr);
 
@@ -264,6 +268,9 @@ export const useEditorStore = create<EditorState>()(
 
       history: [],
       historyIndex: -1,
+      isLoading: true, // Start with loading true for initial hydration
+
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
 
       setImage: (imageData) => {
         set({
@@ -364,42 +371,37 @@ export const useEditorStore = create<EditorState>()(
         processedImage: state.processedImage,
         // Exclude: history, historyIndex (not needed across sessions)
       }),
-      // Handle errors gracefully (e.g., if localStorage is full)
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          console.error('Failed to rehydrate store from localStorage:', error);
-          // If localStorage is full, try to clear old data
-          const errorObj = error as Error;
-          if (errorObj.message?.includes('QuotaExceededError') || errorObj.name === 'QuotaExceededError') {
-            console.warn('localStorage is full. Consider using IndexedDB for larger images.');
-            try {
-              localStorage.removeItem('luma-forge-editor-storage');
-            } catch (e) {
-              console.error('Failed to clear localStorage:', e);
-            }
+      // Handle errors gracefully and manage loading state
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          // Set loading to false when hydration completes (success or error)
+          if (isClient) {
+            setTimeout(() => {
+              useEditorStore.getState().setLoading(false);
+            }, 0);
           }
-        } else if (state && isClient) {
-          console.log('Store rehydrated successfully:', {
-            hasOriginalImage: !!state.originalImage,
-            hasPreviewImage: !!state.previewImage,
-            hasProcessedImage: !!state.processedImage,
-            originalImageSize: state.originalImage ? state.originalImage.length : 0,
-          });
-          // Debug: Check what's actually in localStorage
-          try {
-            const stored = localStorage.getItem('luma-forge-editor-storage');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              console.log('localStorage contains:', {
-                hasOriginalImage: !!parsed.state?.originalImage,
-                hasPreviewImage: !!parsed.state?.previewImage,
-                storageSize: new Blob([stored]).size,
-              });
+
+          if (error) {
+            console.error('Failed to rehydrate store from storage:', error);
+            // If localStorage is full, try to clear old data
+            const errorObj = error as Error;
+            if (errorObj.message?.includes('QuotaExceededError') || errorObj.name === 'QuotaExceededError') {
+              console.warn('localStorage is full. Consider using IndexedDB for larger images.');
+              try {
+                localStorage.removeItem('luma-forge-editor-storage');
+              } catch (e) {
+                console.error('Failed to clear localStorage:', e);
+              }
             }
-          } catch (e) {
-            console.error('Error checking localStorage:', e);
+          } else if (state && isClient) {
+            console.log('Store rehydrated successfully:', {
+              hasOriginalImage: !!state.originalImage,
+              hasPreviewImage: !!state.previewImage,
+              hasProcessedImage: !!state.processedImage,
+              originalImageSize: state.originalImage ? state.originalImage.length : 0,
+            });
           }
-        }
+        };
       },
     }
   )
