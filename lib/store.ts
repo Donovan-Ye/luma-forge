@@ -96,6 +96,8 @@ type PersistedState = {
   originalImage: string | null;
   previewImage: string | null;
   processedImage: string | null;
+  history: { adjustments: ImageAdjustments; crop: CropState }[];
+  historyIndex: number;
 };
 
 // Custom storage that uses IndexedDB for images and localStorage for settings
@@ -387,7 +389,8 @@ export const useEditorStore = create<EditorState>()(
         originalImage: state.originalImage,
         previewImage: state.previewImage,
         processedImage: state.processedImage,
-        // Exclude: history, historyIndex (not needed across sessions)
+        history: state.history,
+        historyIndex: state.historyIndex,
       }),
       // Handle errors gracefully and manage loading state
       onRehydrateStorage: () => {
