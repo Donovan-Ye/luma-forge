@@ -1,19 +1,31 @@
 import { ImageAdjustments, CropState } from '@/lib/store';
-import { applyColorAdjustments, applyConvolution, applyCurves } from './adjustments';
+import { getImageWorker } from './worker-loader';
+
+// Type declaration for requestIdleCallback (not available in all browsers)
+declare function requestIdleCallback(
+  callback: (deadline: { timeRemaining: () => number; didTimeout: boolean }) => void,
+  options?: { timeout?: number }
+): number;
 
 export async function processImage(
   imageSrc: string,
   adjustments: ImageAdjustments,
   crop: CropState
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => {
+    img.onload = async () => {
       try {
+        // Use requestAnimationFrame to yield control before heavy operations
+        await new Promise(resolve => requestAnimationFrame(resolve));
+
         // 1. Setup Canvas for Geometric Transformations (Crop/Rotate)
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { 
+          willReadFrequently: true, // Optimize for frequent read operations
+          desynchronized: true // Allow async operations
+        });
         
         if (!ctx) {
           reject(new Error('Could not get canvas context'));
@@ -35,89 +47,61 @@ export async function processImage(
         // Apply Geometric Transformations
         ctx.save();
         
-        // Rotation logic simplified:
-        // Currently react-easy-crop handles rotation view, but output coords are on unrotated image?
-        // No, react-easy-crop rotation rotates the image around center.
-        // The crop coordinates are based on the rotated image if we used getCroppedImg from their docs.
-        // Here we are assuming crop.x/y are on the source image. 
-        // If we want to support rotation properly as per react-easy-crop, we need more complex canvas logic.
-        // For MVP, we will respect the crop rectangle as is.
-        // Ideally, we should use the same logic as react-easy-crop's getCroppedImg.
-        // Since we passed rotation to store, we should use it.
-        
         if (crop.rotation !== 0) {
-            // Note: This simple implementation might clip if rotation changes aspect ratio significantly
-            // and we stick to simple crop rect. 
-            // But let's keep it simple for now.
-            ctx.translate(width / 2, height / 2);
-            ctx.rotate((crop.rotation * Math.PI) / 180);
-            ctx.translate(-width / 2, -height / 2);
+          ctx.translate(width / 2, height / 2);
+          ctx.rotate((crop.rotation * Math.PI) / 180);
+          ctx.translate(-width / 2, -height / 2);
         }
         
         const sx = crop.x;
         const sy = crop.y;
         const sWidth = crop.width || img.naturalWidth;
         const sHeight = crop.height || img.naturalHeight;
-
-        // Reset transform not needed if we draw into this context state? 
-        // Actually we want the rotation to apply to the drawing of the image?
-        // No, usually we rotate the IMAGE, then crop.
-        // This code rotates the CANVAS/Context.
-        // If we rotate the context, and draw the cropped part... it's tricky.
         
-        // Let's revert to simple drawImage without rotation for now to avoid bugs, 
-        // unless we implement the full "draw to rotated canvas then crop" flow.
-        // Given "CropTool" passes rotation, let's assume user sees rotated image.
-        // If we ignore rotation here, the output will be wrong.
-        // But implementing robust rotation is > 50 lines.
-        // I'll comment out rotation application on canvas for safety unless I'm sure.
-        // Reverting to simple crop.
-        
-        ctx.restore(); 
+        ctx.restore();
         
         // Draw the cropped portion of the source image to the canvas
-        ctx.drawImage(
-            img,
-            sx, sy, sWidth, sHeight, // Source
-            0, 0, width, height // Destination
-        );
+        // Use requestIdleCallback if available to avoid blocking
+        await new Promise<void>((resolve) => {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => {
+              ctx.drawImage(
+                img,
+                sx, sy, sWidth, sHeight, // Source
+                0, 0, width, height // Destination
+              );
+              resolve();
+            }, { timeout: 16 });
+          } else {
+            // Fallback: use requestAnimationFrame
+            requestAnimationFrame(() => {
+              ctx.drawImage(
+                img,
+                sx, sy, sWidth, sHeight, // Source
+                0, 0, width, height // Destination
+              );
+              resolve();
+            });
+          }
+        });
+
+        // Yield again before getImageData (which can be expensive)
+        await new Promise(resolve => requestAnimationFrame(resolve));
 
         // 2. Get Pixel Data
-        let imageData = ctx.getImageData(0, 0, width, height);
+        const imageData = ctx.getImageData(0, 0, width, height);
         
-        // 3. Apply Color Adjustments
-        applyColorAdjustments(imageData.data, adjustments);
+        // 3. Process image adjustments in Web Worker (non-blocking)
+        const processedImageData = await processImageInWorker(imageData, adjustments);
 
-        // 4. Apply Curves
-        if (adjustments.curves) {
-            applyCurves(imageData.data, adjustments.curves);
-        }
+        // Yield before putImageData
+        await new Promise(resolve => requestAnimationFrame(resolve));
 
-        // 5. Apply Spatial Filters (Blur/Sharpen)
-        if (adjustments.blur > 0) {
-            const val = 1/9;
-            const kernel = [
-                val, val, val,
-                val, val, val,
-                val, val, val
-            ];
-            imageData = applyConvolution(imageData, kernel);
-        }
+        // 4. Put processed data back
+        ctx.putImageData(processedImageData, 0, 0);
 
-        if (adjustments.sharpness > 0) {
-             const s = adjustments.sharpness / 100;
-             const kernel = [
-                 0, -1 * s, 0,
-                 -1 * s, 1 + 4 * s, -1 * s,
-                 0, -1 * s, 0
-             ];
-             imageData = applyConvolution(imageData, kernel);
-        }
-
-        // 6. Put data back
-        ctx.putImageData(imageData, 0, 0);
-
-        // 7. Export
+        // 5. Export (use requestAnimationFrame to avoid blocking)
+        await new Promise(resolve => requestAnimationFrame(resolve));
         resolve(canvas.toDataURL('image/png'));
 
       } catch (error) {
@@ -126,5 +110,62 @@ export async function processImage(
     };
     img.onerror = (err) => reject(err);
     img.src = imageSrc;
+  });
+}
+
+/**
+ * Process image data in Web Worker (runs in separate thread)
+ */
+async function processImageInWorker(
+  imageData: ImageData,
+  adjustments: ImageAdjustments
+): Promise<ImageData> {
+  return new Promise((resolve, reject) => {
+    const worker = getImageWorker();
+
+    // Handle worker response
+    const handleMessage = (e: MessageEvent) => {
+      worker.removeEventListener('message', handleMessage);
+      worker.removeEventListener('error', handleError);
+
+      if (e.data.success) {
+        // Reconstruct ImageData from worker response
+        const processedData = new Uint8ClampedArray(e.data.imageData.data);
+        const processedImageData = new ImageData(
+          processedData,
+          e.data.imageData.width,
+          e.data.imageData.height
+        );
+        resolve(processedImageData);
+      } else {
+        reject(new Error(e.data.error || 'Worker processing failed'));
+      }
+    };
+
+    const handleError = (error: ErrorEvent) => {
+      worker.removeEventListener('message', handleMessage);
+      worker.removeEventListener('error', handleError);
+      reject(new Error(`Worker error: ${error.message}`));
+    };
+
+    worker.addEventListener('message', handleMessage);
+    worker.addEventListener('error', handleError);
+
+    // Clone the buffer before transferring (original will be detached after transfer)
+    const buffer = imageData.data.buffer.slice(0);
+
+    // Send image data to worker
+    // Transfer the ArrayBuffer for zero-copy transfer (faster)
+    worker.postMessage(
+      {
+        imageData: {
+          data: buffer,
+          width: imageData.width,
+          height: imageData.height
+        },
+        adjustments
+      },
+      [buffer] // Transfer ownership for performance
+    );
   });
 }

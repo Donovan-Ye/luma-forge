@@ -326,23 +326,45 @@ export function ImageEditor() {
     if (!previewImage) return;
 
     let active = true;
-    const timer = setTimeout(async () => {
-      setIsProcessing(true);
-      try {
-        const result = await processImage(previewImage, adjustments, crop);
-        if (active) {
-          useEditorStore.setState({ processedImage: result });
-        }
-      } catch (error) {
-        console.error("Failed to process image", error);
-      } finally {
-        if (active) setIsProcessing(false);
+    let rafId: number | null = null;
+
+    // Use requestAnimationFrame for smoother updates
+    const scheduleUpdate = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
       }
-    }, 0); // Faster debounce for preview
+
+      rafId = requestAnimationFrame(async () => {
+        setIsProcessing(true);
+        try {
+          const result = await processImage(previewImage, adjustments, crop);
+          if (active) {
+            // Use requestAnimationFrame to update state smoothly
+            requestAnimationFrame(() => {
+              if (active) {
+                useEditorStore.setState({ processedImage: result });
+                setIsProcessing(false);
+              }
+            });
+          } else {
+            setIsProcessing(false);
+          }
+        } catch (error) {
+          console.error("Failed to process image", error);
+          if (active) setIsProcessing(false);
+        }
+      });
+    };
+
+    // Small debounce to batch rapid changes
+    const timer = setTimeout(scheduleUpdate, 16); // ~1 frame at 60fps
 
     return () => {
       active = false;
       clearTimeout(timer);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
     };
   }, [previewImage, adjustments, crop]);
 
