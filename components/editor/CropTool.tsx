@@ -114,12 +114,15 @@ export function CropTool({ onClose }: CropToolProps) {
 
   const handleApply = () => {
     if (completedCrop && imgRef.current) {
+      const { naturalWidth, naturalHeight } = imgRef.current;
       updateCrop({
         x: completedCrop.x,
         y: completedCrop.y,
         width: completedCrop.width,
         height: completedCrop.height,
         rotation: rotation,
+        sourceWidth: naturalWidth,
+        sourceHeight: naturalHeight,
       });
     }
     onClose();
