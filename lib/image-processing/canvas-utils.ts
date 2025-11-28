@@ -30,51 +30,137 @@ export async function processImage(
 
         // Determine if we have a valid crop
         const hasCrop = crop.width > 0 && crop.height > 0;
+        const hasRotation = crop.rotation !== 0 && crop.rotation % 360 !== 0;
 
-        // If crop width/height are 0 (initial state), use full image
-        const width = hasCrop ? crop.width : img.naturalWidth;
-        const height = hasCrop ? crop.height : img.naturalHeight;
+        // react-image-crop provides PixelCrop coordinates
+        // These coordinates are in the natural image space (naturalWidth/naturalHeight)
+        // So we can use them directly
 
-        // Set canvas size to the target output size
-        canvas.width = width;
-        canvas.height = height;
+        let width = hasCrop ? crop.width : img.naturalWidth;
+        let height = hasCrop ? crop.height : img.naturalHeight;
 
-        // Clear canvas with transparent background
-        ctx.clearRect(0, 0, width, height);
+        // Step 1: Handle rotation first (if needed)
+        // When rotation is present, we rotate the image first, then crop
+        if (hasRotation && hasCrop) {
+          const rad = (crop.rotation * Math.PI) / 180;
+          const cos = Math.abs(Math.cos(rad));
+          const sin = Math.abs(Math.sin(rad));
 
-        // Calculate source coordinates
-        const sx = hasCrop ? crop.x : 0;
-        const sy = hasCrop ? crop.y : 0;
-        const sWidth = hasCrop ? crop.width : img.naturalWidth;
-        const sHeight = hasCrop ? crop.height : img.naturalHeight;
+          // Calculate rotated image dimensions
+          const rotatedWidth = img.naturalWidth * cos + img.naturalHeight * sin;
+          const rotatedHeight = img.naturalWidth * sin + img.naturalHeight * cos;
 
-        // Handle rotation: if there's rotation, we need to rotate the cropped area
-        if (crop.rotation !== 0) {
-          // Save context for rotation
+          // Create rotated image canvas
+          const rotatedCanvas = document.createElement('canvas');
+          const rotatedCtx = rotatedCanvas.getContext('2d', {
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: 'high'
+          }) as CanvasRenderingContext2D;
+
+          rotatedCanvas.width = rotatedWidth;
+          rotatedCanvas.height = rotatedHeight;
+
+          // Rotate the full image
+          rotatedCtx.translate(rotatedWidth / 2, rotatedHeight / 2);
+          rotatedCtx.rotate(rad);
+          rotatedCtx.translate(-img.naturalWidth / 2, -img.naturalHeight / 2);
+          rotatedCtx.drawImage(img, 0, 0);
+
+          // Transform crop coordinates from original to rotated space
+          const imgCenterX = img.naturalWidth / 2;
+          const imgCenterY = img.naturalHeight / 2;
+
+          const transformPoint = (x: number, y: number) => {
+            const dx = x - imgCenterX;
+            const dy = y - imgCenterY;
+            const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+            const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+            return {
+              x: rx + rotatedWidth / 2,
+              y: ry + rotatedHeight / 2
+            };
+          };
+
+          // Transform crop rectangle corners
+          const corners = [
+            transformPoint(crop.x, crop.y),
+            transformPoint(crop.x + crop.width, crop.y),
+            transformPoint(crop.x, crop.y + crop.height),
+            transformPoint(crop.x + crop.width, crop.y + crop.height),
+          ];
+
+          // Find bounding box in rotated space
+          const minX = Math.max(0, Math.min(...corners.map(c => c.x)));
+          const maxX = Math.min(rotatedWidth, Math.max(...corners.map(c => c.x)));
+          const minY = Math.max(0, Math.min(...corners.map(c => c.y)));
+          const maxY = Math.min(rotatedHeight, Math.max(...corners.map(c => c.y)));
+
+          // Update crop coordinates for rotated image
+          const rotatedCropX = minX;
+          const rotatedCropY = minY;
+          const rotatedCropWidth = maxX - minX;
+          const rotatedCropHeight = maxY - minY;
+
+          // Set canvas size to crop dimensions
+          canvas.width = crop.width;
+          canvas.height = crop.height;
+
+          // Draw cropped area and rotate back
           ctx.save();
-
-          // Move to center of canvas
-          ctx.translate(width / 2, height / 2);
-
-          // Rotate
-          ctx.rotate((crop.rotation * Math.PI) / 180);
-
-          // Draw the cropped image centered
+          ctx.translate(crop.width / 2, crop.height / 2);
+          ctx.rotate(-rad);
+          ctx.translate(-crop.width / 2, -crop.height / 2);
           ctx.drawImage(
-            img,
-            sx, sy, sWidth, sHeight, // Source
-            -width / 2, -height / 2, width, height // Destination (centered)
+            rotatedCanvas,
+            rotatedCropX, rotatedCropY, rotatedCropWidth, rotatedCropHeight,
+            0, 0, crop.width, crop.height
           );
-
-          // Restore context
           ctx.restore();
-        } else {
-          // No rotation, draw directly
+
+          width = crop.width;
+          height = crop.height;
+        } else if (hasRotation) {
+          // Only rotation, no crop
+          const rad = (crop.rotation * Math.PI) / 180;
+          const cos = Math.abs(Math.cos(rad));
+          const sin = Math.abs(Math.sin(rad));
+          const rotatedWidth = img.naturalWidth * cos + img.naturalHeight * sin;
+          const rotatedHeight = img.naturalWidth * sin + img.naturalHeight * cos;
+
+          canvas.width = rotatedWidth;
+          canvas.height = rotatedHeight;
+          ctx.clearRect(0, 0, rotatedWidth, rotatedHeight);
+          ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+          ctx.rotate(rad);
+          ctx.translate(-img.naturalWidth / 2, -img.naturalHeight / 2);
+          ctx.drawImage(img, 0, 0);
+
+          // Get image data from this canvas for further processing
+          const imageData = ctx.getImageData(0, 0, rotatedWidth, rotatedHeight);
+          const processedImageData = await processImageInWorker(imageData, adjustments);
+          ctx.putImageData(processedImageData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+          return;
+        } else if (hasCrop) {
+          // Simple crop without rotation
+          canvas.width = crop.width;
+          canvas.height = crop.height;
+          ctx.clearRect(0, 0, crop.width, crop.height);
           ctx.drawImage(
             img,
-            sx, sy, sWidth, sHeight, // Source
-            0, 0, width, height // Destination
+            crop.x, crop.y, crop.width, crop.height,
+            0, 0, crop.width, crop.height
           );
+          width = crop.width;
+          height = crop.height;
+        } else {
+          // No crop, no rotation - use full image
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          ctx.clearRect(0, 0, img.naturalWidth, img.naturalHeight);
+          ctx.drawImage(img, 0, 0);
+          width = img.naturalWidth;
+          height = img.naturalHeight;
         }
 
         // Yield again before getImageData (which can be expensive)
