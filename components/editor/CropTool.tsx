@@ -53,7 +53,7 @@ export function CropTool({ onClose }: CropToolProps) {
   const updateViewportSize = useCallback(
     (dims?: Dimensions) => {
       const currentDims = dims ?? imageDimensions;
-      if (!currentDims || !containerRef.current) return;
+      if (!currentDims || !containerRef.current) return { width: 0, height: 0 };
 
       const { clientWidth, clientHeight } = containerRef.current;
       const aspect = currentDims.width / currentDims.height;
@@ -67,30 +67,35 @@ export function CropTool({ onClose }: CropToolProps) {
       }
 
       setViewportSize({ width, height });
+
+      return { width, height };
     },
     [imageDimensions]
   );
 
   const onImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
-      const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
+      const { naturalWidth, naturalHeight } = e.currentTarget;
 
-      setImageDimensions({ width, height });
-      updateViewportSize({ width, height });
+      setImageDimensions({ width: naturalWidth, height: naturalHeight });
+      const {
+        width: viewportWidth,
+        height: viewportHeight,
+      } = updateViewportSize({ width: naturalWidth, height: naturalHeight });
 
       // If we have existing crop, restore it; otherwise center crop
       if (crop.width > 0 && crop.height > 0) {
         // Convert pixel crop to percent crop for react-image-crop
         const percentCrop: Crop = {
           unit: '%',
-          x: (crop.x / width) * 100,
-          y: (crop.y / height) * 100,
-          width: (crop.width / width) * 100,
-          height: (crop.height / height) * 100,
+          x: (crop.x / viewportWidth) * 100,
+          y: (crop.y / viewportHeight) * 100,
+          width: (crop.width / viewportWidth) * 100,
+          height: (crop.height / viewportHeight) * 100,
         };
         setCropState(percentCrop);
       } else {
-        const newCrop = centerAspectCrop(width, height, undefined);
+        const newCrop = centerAspectCrop(viewportWidth, viewportHeight, undefined);
         setCropState(newCrop);
       }
     },
@@ -114,16 +119,17 @@ export function CropTool({ onClose }: CropToolProps) {
 
   const handleApply = () => {
     if (completedCrop && imgRef.current) {
-      const { naturalWidth, naturalHeight } = imgRef.current;
-      updateCrop({
+      const crop = {
         x: completedCrop.x,
         y: completedCrop.y,
         width: completedCrop.width,
         height: completedCrop.height,
         rotation: rotation,
-        sourceWidth: naturalWidth,
-        sourceHeight: naturalHeight,
-      });
+        sourceWidth: viewportSize?.width ?? 0,
+        sourceHeight: viewportSize?.height ?? 0,
+        aspectRatio: completedCrop.width / completedCrop.height,
+      }
+      updateCrop(crop);
     }
     onClose();
   };
@@ -132,6 +138,7 @@ export function CropTool({ onClose }: CropToolProps) {
 
   return (
     <div className="absolute inset-0 z-50 bg-background flex flex-col">
+      {JSON.stringify(viewportSize)}
       <div
         ref={containerRef}
         className="relative flex-1 bg-black/90 flex items-center justify-center overflow-hidden p-4"

@@ -30,8 +30,7 @@ export async function processImage(
 
         // Determine if we have a valid crop
         const hasCrop = crop.width > 0 && crop.height > 0;
-
-        const cropRatio = img.naturalWidth / crop.width;
+        const cropRatio = img.naturalWidth / crop.sourceWidth;
 
         const effectiveCrop = hasCrop
           ? {

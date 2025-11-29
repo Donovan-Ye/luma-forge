@@ -30,9 +30,9 @@ export interface CropState {
   width: number;
   height: number;
   rotation: number;
-  aspectRatio: number | null; // null for free
-  sourceWidth: number | null;
-  sourceHeight: number | null;
+  aspectRatio: number;
+  sourceWidth: number;
+  sourceHeight: number;
 }
 
 interface EditorState {
@@ -85,9 +85,9 @@ const DEFAULT_CROP: CropState = {
   width: 0,
   height: 0,
   rotation: 0,
-  aspectRatio: null,
-  sourceWidth: null,
-  sourceHeight: null,
+  aspectRatio: 1,
+  sourceWidth: 0,
+  sourceHeight: 0,
 };
 
 // Helper to check if we're on the client side
