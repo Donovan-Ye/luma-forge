@@ -6,7 +6,7 @@ import { useEditorStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Check, X } from 'lucide-react';
+import { Check, X, Loader2 } from 'lucide-react';
 import 'react-image-crop/dist/ReactCrop.css';
 
 interface CropToolProps {
@@ -53,9 +53,17 @@ export function CropTool({ onClose }: CropToolProps) {
   const updateViewportSize = useCallback(
     (dims?: Dimensions) => {
       const currentDims = dims ?? imageDimensions;
-      if (!currentDims || !containerRef.current) return { width: 0, height: 0 };
+      if (!currentDims || !containerRef.current) {
+        setViewportSize(null);
+        return { width: 0, height: 0 };
+      }
 
       const { clientWidth, clientHeight } = containerRef.current;
+      if (clientWidth === 0 || clientHeight === 0) {
+        setViewportSize(null);
+        return { width: 0, height: 0 };
+      }
+
       const aspect = currentDims.width / currentDims.height;
 
       let height = clientHeight;
@@ -103,6 +111,17 @@ export function CropTool({ onClose }: CropToolProps) {
   );
 
   useEffect(() => {
+    // Initial viewport size calculation after container is mounted
+    if (imageDimensions && containerRef.current) {
+      // Use a small delay to ensure container dimensions are available
+      const timer = setTimeout(() => {
+        updateViewportSize();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [imageDimensions, updateViewportSize]);
+
+  useEffect(() => {
     const handleResize = () => updateViewportSize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -136,16 +155,31 @@ export function CropTool({ onClose }: CropToolProps) {
 
   if (!originalImage) return null;
 
+  // Check if viewport is ready (both image dimensions and viewport size are set and valid)
+  const isViewportReady =
+    imageDimensions &&
+    viewportSize &&
+    viewportSize.width > 0 &&
+    viewportSize.height > 0
+
   return (
     <div className="absolute inset-0 z-50 bg-background flex flex-col">
-      {JSON.stringify(viewportSize)}
       <div
         ref={containerRef}
         className="relative flex-1 bg-black/90 flex items-center justify-center overflow-hidden p-4"
       >
+        {/* Loading indicator above the crop */}
+        {!isViewportReady && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-lg text-white">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <p className="text-sm">Calculating viewport...</p>
+          </div>
+        )}
+
         <div
           className="flex items-center justify-center"
           style={{
+            display: isViewportReady ? 'flex' : 'none',
             width: viewportSize?.width ?? 'auto',
             height: viewportSize?.height ?? 'auto',
           }}
