@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
-import { useEditorStore } from '@/lib/store';
+import { useEditorStore, useCrop } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, Plus } from 'lucide-react';
 import 'react-image-crop/dist/ReactCrop.css';
 
 interface CropToolProps {
@@ -41,9 +41,21 @@ type Dimensions = {
 };
 
 export function CropTool({ onClose }: CropToolProps) {
-  const { originalImage, crop, updateCrop } = useEditorStore();
+  const {
+    images,
+    currentImageId,
+    setCurrentImage,
+    addImage,
+    updateCrop,
+  } = useEditorStore();
+  const crop = useCrop();
+
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const currentImage = images.find(img => img.id === currentImageId);
+
   const [cropState, setCropState] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [rotation, setRotation] = useState(crop.rotation || 0);
@@ -136,8 +148,47 @@ export function CropTool({ onClose }: CropToolProps) {
     setCompletedCrop(crop);
   }, []);
 
+  const handleAddImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        addImage(event.target.result as string);
+        // Reset crop state for new image
+        setCropState(undefined);
+        setCompletedCrop(null);
+        setImageDimensions(null);
+        setViewportSize(null);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSelectImage = (imageId: string) => {
+    setCurrentImage(imageId);
+    const selectedImage = images.find(img => img.id === imageId);
+    if (selectedImage) {
+      setRotation(selectedImage.crop.rotation || 0);
+      // Reset dimensions to trigger recalculation
+      setImageDimensions(null);
+      setViewportSize(null);
+    }
+  };
+
+  const handleRotationChange = (newRotation: number) => {
+    setRotation(newRotation);
+    // Update rotation in crop state
+    updateCrop({ rotation: newRotation });
+  };
+
   const handleApply = () => {
-    if (completedCrop && imgRef.current) {
+    if (completedCrop && imgRef.current && currentImage) {
       const crop = {
         x: completedCrop.x,
         y: completedCrop.y,
@@ -153,7 +204,8 @@ export function CropTool({ onClose }: CropToolProps) {
     onClose();
   };
 
-  if (!originalImage) return null;
+
+  if (!currentImage) return null;
 
   // Check if viewport is ready (both image dimensions and viewport size are set and valid)
   const isViewportReady =
@@ -194,9 +246,10 @@ export function CropTool({ onClose }: CropToolProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
-              src={originalImage}
+              src={currentImage.originalImage}
               alt="Crop"
               onLoad={onImageLoad}
+              key={currentImageId}
               style={{
                 width: '100%',
                 height: '100%',
@@ -209,32 +262,77 @@ export function CropTool({ onClose }: CropToolProps) {
         </div>
       </div>
 
-      <div className="h-48 bg-background border-t p-6 flex flex-col gap-6">
-        <div className="flex items-center gap-8 max-w-2xl mx-auto w-full">
-          <div className="flex-1 space-y-3">
-            <div className="flex justify-between">
-              <Label>Rotation</Label>
-              <span className="text-xs text-muted-foreground">{rotation}°</span>
-            </div>
-            <Slider
-              value={[rotation]}
-              min={0}
-              max={360}
-              step={1}
-              onValueChange={(v) => setRotation(v[0])}
+      <div className="bg-background border-t flex flex-col">
+        {/* Image thumbnails list */}
+        <div className="px-6 pt-4 pb-2 border-b">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            {images.map((image) => (
+              <button
+                key={image.id}
+                onClick={() => handleSelectImage(image.id)}
+                className={`
+                  relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all
+                  ${currentImageId === image.id
+                    ? 'border-primary ring-2 ring-primary/20'
+                    : 'border-muted hover:border-primary/50'
+                  }
+                `}
+              >
+                <img
+                  src={image.processedImage || image.originalImage}
+                  alt={`Image ${image.id}`}
+                  className="w-full h-full object-cover"
+                />
+                {currentImageId === image.id && (
+                  <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                    <div className="w-2 h-2 bg-primary rounded-full" />
+                  </div>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 flex items-center justify-center transition-colors"
+            >
+              <Plus className="w-6 h-6 text-muted-foreground" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAddImage}
+              className="hidden"
             />
           </div>
         </div>
 
-        <div className="flex justify-center gap-4">
-          <Button variant="outline" onClick={onClose}>
-            <X className="w-4 h-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={handleApply}>
-            <Check className="w-4 h-4 mr-2" />
-            Apply Crop
-          </Button>
+        <div className="p-6 flex flex-col gap-6">
+          <div className="flex items-center gap-8 max-w-2xl mx-auto w-full">
+            <div className="flex-1 space-y-3">
+              <div className="flex justify-between">
+                <Label>Rotation</Label>
+                <span className="text-xs text-muted-foreground">{rotation}°</span>
+              </div>
+              <Slider
+                value={[rotation]}
+                min={0}
+                max={360}
+                step={1}
+                onValueChange={(v) => handleRotationChange(v[0])}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-center gap-4">
+            <Button variant="outline" onClick={onClose}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleApply}>
+              <Check className="w-4 h-4 mr-2" />
+              Apply Crop
+            </Button>
+          </div>
         </div>
       </div>
     </div>

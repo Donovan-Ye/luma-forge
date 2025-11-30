@@ -8,28 +8,39 @@ import { cn } from '@/lib/utils';
 
 export function ImageUpload() {
   const setImage = useEditorStore((state) => state.setImage);
+  const addImage = useEditorStore((state) => state.addImage);
+  const images = useEditorStore((state) => state.images);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) return;
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setImage(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    // If no images exist, use setImage for the first one, otherwise use addImage
+    const isFirstImage = images.length === 0;
+
+    imageFiles.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          if (isFirstImage && index === 0) {
+            setImage(e.target.result as string);
+          } else {
+            addImage(e.target.result as string);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
-    if (e.dataTransfer.files?.[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
+    handleFiles(e.dataTransfer.files);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -43,8 +54,10 @@ export function ImageUpload() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      handleFile(e.target.files[0]);
+    handleFiles(e.target.files);
+    // Reset input to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -63,18 +76,18 @@ export function ImageUpload() {
           <Upload className="w-10 h-10 text-primary" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold">Upload an image to edit</h3>
+          <h3 className="text-xl font-semibold">Upload images to edit</h3>
           <p className="text-sm text-muted-foreground">
-            Drag and drop or click to select
+            Drag and drop or click to select (multiple images supported)
           </p>
           <p className="text-xs text-muted-foreground">
             Supports JPG, PNG, WebP
           </p>
         </div>
-        <Button 
-            onClick={() => fileInputRef.current?.click()}
-            variant="secondary"
-            size="lg"
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          variant="secondary"
+          size="lg"
         >
           Select Image
         </Button>
@@ -83,6 +96,7 @@ export function ImageUpload() {
           ref={fileInputRef}
           onChange={handleChange}
           accept="image/*"
+          multiple
           className="hidden"
         />
       </div>

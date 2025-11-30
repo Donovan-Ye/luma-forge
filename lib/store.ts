@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import { persist, PersistStorage } from 'zustand/middleware';
+import { useMemo } from 'react';
+import {
+  storeImageBlobs,
+  getImageBlobs,
+  deleteImageBlobs,
+  clearAllImageBlobs,
+  getAllImageIds,
+} from './indexeddb-utils';
 
 export interface Point { x: number; y: number }
 
@@ -35,20 +43,29 @@ export interface CropState {
   sourceHeight: number;
 }
 
-interface EditorState {
-  originalImage: string | null; // Data URL (Full Resolution)
+export interface ImageData {
+  id: string;
+  originalImage: string; // Data URL (Full Resolution)
   previewImage: string | null; // Data URL (Low Resolution for editing)
   processedImage: string | null; // Data URL for result preview
-
   adjustments: ImageAdjustments;
   crop: CropState;
-
   history: { adjustments: ImageAdjustments; crop: CropState }[];
   historyIndex: number;
+}
+
+interface EditorState {
+  images: ImageData[];
+  currentImageId: string | null;
   isLoading: boolean; // Loading state for IndexedDB operations
 
+  // Actions
   setImage: (imageData: string) => void;
+  addImage: (imageData: string) => void;
+  removeImage: (imageId: string) => void;
+  setCurrentImage: (imageId: string) => void;
   setPreviewImage: (imageData: string) => void;
+  setProcessedImage: (imageData: string) => void;
   updateAdjustments: (updates: Partial<ImageAdjustments>) => void;
   updateCrop: (updates: Partial<CropState>) => void;
   undo: () => void;
@@ -90,18 +107,40 @@ const DEFAULT_CROP: CropState = {
   sourceHeight: 0,
 };
 
+// Cached default values to avoid creating new objects on every selector call
+const CACHED_DEFAULT_ADJUSTMENTS = Object.freeze({ ...DEFAULT_ADJUSTMENTS });
+const CACHED_DEFAULT_CROP = Object.freeze({ ...DEFAULT_CROP });
+const CACHED_EMPTY_HISTORY_ARRAY = Object.freeze([]);
+const CACHED_EMPTY_HISTORY = Object.freeze({ history: CACHED_EMPTY_HISTORY_ARRAY, historyIndex: -1 });
+
 // Helper to check if we're on the client side
 const isClient = typeof window !== 'undefined';
 
 // Type for the persisted state (without functions)
 type PersistedState = {
-  adjustments: ImageAdjustments;
-  crop: CropState;
-  originalImage: string | null;
-  previewImage: string | null;
-  processedImage: string | null;
-  history: { adjustments: ImageAdjustments; crop: CropState }[];
-  historyIndex: number;
+  images: ImageData[];
+  currentImageId: string | null;
+  // Legacy fields for migration
+  originalImage?: string | null;
+  previewImage?: string | null;
+  processedImage?: string | null;
+  adjustments?: ImageAdjustments;
+  crop?: CropState;
+  history?: { adjustments: ImageAdjustments; crop: CropState }[];
+  historyIndex?: number;
+};
+
+// Type for metadata-only persisted state (images stored in IndexedDB)
+type PersistedMetadata = {
+  imageMetadata: Array<{
+    id: string;
+    adjustments: ImageAdjustments;
+    crop: CropState;
+    history: { adjustments: ImageAdjustments; crop: CropState }[];
+    historyIndex: number;
+  }>;
+  currentImageId: string | null;
+  storageVersion: number; // Track storage format version for migrations
 };
 
 // Custom storage that uses IndexedDB for images and localStorage for settings
@@ -115,149 +154,267 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
     };
   }
 
-  const DB_NAME = 'luma-forge-db';
-  const DB_VERSION = 1;
-  const STORE_NAME = 'images';
   const SETTINGS_KEY = 'luma-forge-editor-settings';
-
-  // Initialize IndexedDB
-  const initDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
-        }
-      };
-    });
-  };
+  const STORAGE_VERSION = 2; // Increment when storage format changes
 
   return {
-    getItem: async (name: string) => {
+    getItem: async (_name: string) => {
       try {
-        // Get settings from localStorage
+        // Get metadata from localStorage
         const settingsStr = localStorage.getItem(SETTINGS_KEY);
         if (!settingsStr) {
           return null;
         }
 
         const settings = JSON.parse(settingsStr);
+        const metadata = settings.state as PersistedMetadata | PersistedState;
 
-        // Get images from IndexedDB
-        const db = await initDB();
-        const imageKeys = ['originalImage', 'previewImage', 'processedImage'];
-        const images: Record<string, string | null> = {};
+        // Check if this is the new format with IndexedDB (storageVersion === 2)
+        if (metadata && 'storageVersion' in metadata && metadata.storageVersion === STORAGE_VERSION) {
+          // New format - images in IndexedDB, metadata in localStorage
+          const imageMetadata = metadata.imageMetadata || [];
+          const images: ImageData[] = [];
 
-        for (const key of imageKeys) {
-          try {
-            const value = await new Promise<string | null>((resolve, reject) => {
-              const transaction = db.transaction([STORE_NAME], 'readonly');
-              const store = transaction.objectStore(STORE_NAME);
-              const request = store.get(`${name}-${key}`);
-              request.onsuccess = () => resolve(request.result || null);
-              request.onerror = () => reject(request.error);
+          // Load images from IndexedDB
+          for (const meta of imageMetadata) {
+            const blobs = await getImageBlobs(meta.id);
+            images.push({
+              id: meta.id,
+              originalImage: blobs.originalImage || '',
+              previewImage: blobs.previewImage,
+              processedImage: blobs.processedImage,
+              adjustments: meta.adjustments || { ...DEFAULT_ADJUSTMENTS },
+              crop: meta.crop || { ...DEFAULT_CROP },
+              history: meta.history || [],
+              historyIndex: meta.historyIndex ?? -1,
             });
-            images[key] = value;
-          } catch (e) {
-            console.warn(`Failed to get ${key} from IndexedDB:`, e);
-            images[key] = null;
           }
+
+          return {
+            state: {
+              images,
+              currentImageId: metadata.currentImageId || null,
+            },
+            version: settings.version || 0,
+          };
         }
 
-        db.close();
+        // Legacy format - migrate from localStorage-only storage
+        const state = metadata as PersistedState;
 
-        // Merge settings and images
-        const mergedState: PersistedState = {
-          ...settings.state,
-          ...images,
-        } as PersistedState;
+        if (state.images && Array.isArray(state.images)) {
+          // Old format with images in localStorage - migrate to IndexedDB
+          const migratedImages: ImageData[] = [];
 
-        return {
-          state: mergedState,
-          version: settings.version || 0,
-        };
+          for (const img of state.images) {
+            // Store images in IndexedDB
+            await storeImageBlobs(
+              img.id,
+              img.originalImage || null,
+              img.previewImage || null,
+              img.processedImage || null
+            );
+
+            migratedImages.push(img);
+          }
+
+          // Save metadata only to localStorage
+          const metadataOnly: PersistedMetadata = {
+            imageMetadata: migratedImages.map(img => ({
+              id: img.id,
+              adjustments: img.adjustments,
+              crop: img.crop,
+              history: img.history || [],
+              historyIndex: img.historyIndex ?? -1,
+            })),
+            currentImageId: state.currentImageId || null,
+            storageVersion: STORAGE_VERSION,
+          };
+
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+              state: metadataOnly,
+              version: settings.version || 0,
+            }));
+          } catch (error) {
+            console.error('Failed to save migrated metadata:', error);
+          }
+
+          return {
+            state: {
+              images: migratedImages,
+              currentImageId: state.currentImageId || null,
+            },
+            version: settings.version || 0,
+          };
+        }
+
+        // Very old legacy format - migrate single image
+        if (state.originalImage) {
+          const imageId = '1';
+
+          // Store in IndexedDB
+          await storeImageBlobs(
+            imageId,
+            state.originalImage || null,
+            state.previewImage || null,
+            state.processedImage || state.originalImage || null
+          );
+
+          const migratedImage: ImageData = {
+            id: imageId,
+            originalImage: state.originalImage,
+            previewImage: state.previewImage || null,
+            processedImage: state.processedImage || state.originalImage,
+            adjustments: state.adjustments || { ...DEFAULT_ADJUSTMENTS },
+            crop: state.crop || { ...DEFAULT_CROP },
+            history: state.history || [],
+            historyIndex: state.historyIndex ?? -1,
+          };
+
+          // Save metadata only
+          const metadataOnly: PersistedMetadata = {
+            imageMetadata: [{
+              id: imageId,
+              adjustments: migratedImage.adjustments,
+              crop: migratedImage.crop,
+              history: migratedImage.history,
+              historyIndex: migratedImage.historyIndex,
+            }],
+            currentImageId: '1',
+            storageVersion: STORAGE_VERSION,
+          };
+
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+              state: metadataOnly,
+              version: settings.version || 0,
+            }));
+          } catch (error) {
+            console.error('Failed to save migrated metadata:', error);
+          }
+
+          return {
+            state: {
+              images: [migratedImage],
+              currentImageId: '1',
+            },
+            version: settings.version || 0,
+          };
+        }
+
+        return null;
       } catch (error) {
         console.error('Error getting from hybrid storage:', error);
         return null;
       }
     },
 
-    setItem: async (name: string, value) => {
+    setItem: async (_name: string, value) => {
       try {
         const state = (value as { state: PersistedState; version?: number }).state;
-
-        // Separate images from settings
-        const { originalImage, previewImage, processedImage, ...settings } = state;
-
-        // Save settings to localStorage
         const version = (value as { version?: number }).version || 0;
+
+        if (!state.images || state.images.length === 0) {
+          // No images to save - just save metadata
+          const metadataOnly: PersistedMetadata = {
+            imageMetadata: [],
+            currentImageId: null,
+            storageVersion: STORAGE_VERSION,
+          };
+
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+            state: metadataOnly,
+            version: version,
+          }));
+
+          // Clear IndexedDB
+          await clearAllImageBlobs();
+          return;
+        }
+
+        // Extract metadata (without image data)
+        const imageMetadata = state.images.map(img => ({
+          id: img.id,
+          adjustments: img.adjustments,
+          crop: img.crop,
+          history: img.history || [],
+          historyIndex: img.historyIndex ?? -1,
+        }));
+
+        // Save metadata to localStorage (small size)
+        const metadataOnly: PersistedMetadata = {
+          imageMetadata,
+          currentImageId: state.currentImageId || null,
+          storageVersion: STORAGE_VERSION,
+        };
+
+        // Store images in IndexedDB and metadata in localStorage
+        const storagePromises = state.images.map(img =>
+          storeImageBlobs(
+            img.id,
+            img.originalImage || null,
+            img.previewImage || null,
+            img.processedImage || null
+          )
+        );
+
+        // Save metadata to localStorage (should be small now)
         localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-          state: settings,
+          state: metadataOnly,
           version: version,
         }));
 
-        // Save images to IndexedDB
-        const db = await initDB();
-        const imageData = [
-          { key: 'originalImage', value: originalImage },
-          { key: 'previewImage', value: previewImage },
-          { key: 'processedImage', value: processedImage },
-        ];
+        // Store all images in IndexedDB
+        await Promise.all(storagePromises);
 
-        for (const { key, value: imageValue } of imageData) {
-          try {
-            await new Promise<void>((resolve, reject) => {
-              const transaction = db.transaction([STORE_NAME], 'readwrite');
-              const store = transaction.objectStore(STORE_NAME);
-              const request = store.put(imageValue, `${name}-${key}`);
-              request.onsuccess = () => resolve();
-              request.onerror = () => reject(request.error);
-            });
-          } catch (e) {
-            console.warn(`Failed to save ${key} to IndexedDB:`, e);
-          }
+        // Clean up IndexedDB: remove images that are no longer in state
+        const currentImageIds = new Set(state.images.map(img => img.id));
+        const allStoredIds = await getAllImageIds();
+
+        if (allStoredIds && allStoredIds.length > 0) {
+          const idsToDelete = allStoredIds.filter(id => !currentImageIds.has(id));
+          await Promise.all(idsToDelete.map(id => deleteImageBlobs(id)));
         }
-
-        db.close();
       } catch (error) {
         console.error('Error setting hybrid storage:', error);
-        // Fallback: try to save without images if IndexedDB fails
-        try {
-          const state = (value as { state: PersistedState; version?: number }).state;
-          const { originalImage, previewImage, processedImage, ...settings } = state;
-          const version = (value as { version?: number }).version || 0;
-          localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-            state: settings,
-            version: version,
-          }));
-        } catch (e) {
-          console.error('Failed to save settings as fallback:', e);
+        // If localStorage is still full (shouldn't happen with metadata only), try to clear old data
+        if (error instanceof Error && (error.name === 'QuotaExceededError' || error.message.includes('QuotaExceededError'))) {
+          console.warn('localStorage is full. Attempting to clear old data.');
+          try {
+            // Clear old format data if it exists
+            localStorage.removeItem('luma-forge-editor-storage');
+            // Retry with just current data
+            const state = (value as { state: PersistedState; version?: number }).state;
+            if (state.images && state.images.length > 0) {
+              const imageMetadata = state.images.map(img => ({
+                id: img.id,
+                adjustments: img.adjustments,
+                crop: img.crop,
+                history: img.history || [],
+                historyIndex: img.historyIndex ?? -1,
+              }));
+              const metadataOnly: PersistedMetadata = {
+                imageMetadata,
+                currentImageId: state.currentImageId || null,
+                storageVersion: STORAGE_VERSION,
+              };
+              localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                state: metadataOnly,
+                version: (value as { version?: number }).version || 0,
+              }));
+            }
+          } catch (retryError) {
+            console.error('Failed to recover from storage error:', retryError);
+          }
         }
       }
     },
 
-    removeItem: async (name: string): Promise<void> => {
+    removeItem: async (_name: string): Promise<void> => {
       try {
         localStorage.removeItem(SETTINGS_KEY);
-        const db = await initDB();
-        const imageKeys = ['originalImage', 'previewImage', 'processedImage'];
-        for (const key of imageKeys) {
-          try {
-            await new Promise<void>((resolve, reject) => {
-              const transaction = db.transaction([STORE_NAME], 'readwrite');
-              const store = transaction.objectStore(STORE_NAME);
-              const request = store.delete(`${name}-${key}`);
-              request.onsuccess = () => resolve();
-              request.onerror = () => reject(request.error);
-            });
-          } catch (e) {
-            console.warn(`Failed to delete ${key} from IndexedDB:`, e);
-          }
-        }
-        db.close();
+        await clearAllImageBlobs();
       } catch (error) {
         console.error('Error removing from hybrid storage:', error);
       }
@@ -265,136 +422,230 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
   };
 };
 
+// Helper to create a new image data object
+const createImageData = (imageData: string, id?: string): ImageData => ({
+  id: id || String(Date.now()),
+  originalImage: imageData,
+  previewImage: null,
+  processedImage: imageData,
+  adjustments: {
+    ...DEFAULT_ADJUSTMENTS,
+    curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
+  },
+  crop: { ...DEFAULT_CROP },
+  history: [],
+  historyIndex: -1,
+});
+
+// Helper to get current image
+const getCurrentImage = (state: EditorState): ImageData | null => {
+  if (!state.currentImageId) return null;
+  return state.images.find(img => img.id === state.currentImageId) || null;
+};
+
 export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
-      originalImage: null,
-      previewImage: null,
-      processedImage: null,
-
-      adjustments: { ...DEFAULT_ADJUSTMENTS },
-      crop: { ...DEFAULT_CROP },
-
-      history: [],
-      historyIndex: -1,
-      isLoading: true, // Start with loading true for initial hydration
+      images: [],
+      currentImageId: null,
+      isLoading: true,
 
       setLoading: (loading: boolean) => set({ isLoading: loading }),
 
       setImage: (imageData) => {
+        const newImage = createImageData(imageData);
         set({
-          originalImage: imageData,
-          previewImage: null, // Will be set by UI
-          processedImage: imageData,
-          adjustments: {
-            ...DEFAULT_ADJUSTMENTS,
-            curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
-          },
-          crop: { ...DEFAULT_CROP },
-          history: [],
-          historyIndex: -1,
+          images: [newImage],
+          currentImageId: newImage.id,
         });
       },
 
+      addImage: (imageData) => {
+        const newImage = createImageData(imageData);
+        set((state) => ({
+          images: [...state.images, newImage],
+          currentImageId: newImage.id,
+        }));
+      },
+
+      removeImage: (imageId) => {
+        set((state) => {
+          const newImages = state.images.filter(img => img.id !== imageId);
+          let newCurrentId = state.currentImageId;
+
+          // If we're removing the current image, switch to another one
+          if (state.currentImageId === imageId) {
+            newCurrentId = newImages.length > 0 ? newImages[0].id : null;
+          }
+
+          return {
+            images: newImages,
+            currentImageId: newCurrentId,
+          };
+        });
+      },
+
+      setCurrentImage: (imageId) => {
+        set({ currentImageId: imageId });
+      },
+
       setPreviewImage: (imageData) => {
-        set({ previewImage: imageData });
+        const state = get();
+        if (!state.currentImageId) return;
+
+        set({
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? { ...img, previewImage: imageData }
+              : img
+          ),
+        });
+      },
+
+      setProcessedImage: (imageData) => {
+        const state = get();
+        if (!state.currentImageId) return;
+
+        set({
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? { ...img, processedImage: imageData }
+              : img
+          ),
+        });
       },
 
       updateAdjustments: (updates) => {
-        const { adjustments, history, historyIndex } = get();
-        const newAdjustments = { ...adjustments, ...updates };
+        const state = get();
+        if (!state.currentImageId) return;
 
-        // Add to history
-        const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push({ adjustments, crop: get().crop });
+        const current = getCurrentImage(state);
+        if (!current) return;
+
+        const newAdjustments = { ...current.adjustments, ...updates };
+        const newHistory = current.history.slice(0, current.historyIndex + 1);
+        newHistory.push({ adjustments: current.adjustments, crop: current.crop });
 
         set({
-          adjustments: newAdjustments,
-          history: newHistory,
-          historyIndex: newHistory.length - 1,
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? {
+                ...img,
+                adjustments: newAdjustments,
+                history: newHistory,
+                historyIndex: newHistory.length - 1,
+              }
+              : img
+          ),
         });
       },
 
       updateCrop: (updates) => {
-        const { crop, history, historyIndex } = get();
-        const newCrop = { ...crop, ...updates };
+        const state = get();
+        if (!state.currentImageId) return;
 
-        // Add to history
-        const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push({ adjustments: get().adjustments, crop });
+        const current = getCurrentImage(state);
+        if (!current) return;
+
+        const newCrop = { ...current.crop, ...updates };
+        const newHistory = current.history.slice(0, current.historyIndex + 1);
+        newHistory.push({ adjustments: current.adjustments, crop: current.crop });
 
         set({
-          crop: newCrop,
-          history: newHistory,
-          historyIndex: newHistory.length - 1,
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? {
+                ...img,
+                crop: newCrop,
+                history: newHistory,
+                historyIndex: newHistory.length - 1,
+              }
+              : img
+          ),
         });
       },
 
       undo: () => {
-        const { history, historyIndex } = get();
-        if (historyIndex >= 0) {
-          const previousState = history[historyIndex];
-          set({
-            adjustments: previousState.adjustments,
-            crop: previousState.crop,
-            historyIndex: historyIndex - 1,
-          });
-        }
+        const state = get();
+        if (!state.currentImageId) return;
+
+        const current = getCurrentImage(state);
+        if (!current || current.historyIndex < 0) return;
+
+        const previousState = current.history[current.historyIndex];
+        set({
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? {
+                ...img,
+                adjustments: previousState.adjustments,
+                crop: previousState.crop,
+                historyIndex: current.historyIndex - 1,
+              }
+              : img
+          ),
+        });
       },
 
       redo: () => {
-        const { history, historyIndex } = get();
-        if (historyIndex < history.length - 1) {
-          const nextState = history[historyIndex + 1];
-          set({
-            adjustments: nextState.adjustments,
-            crop: nextState.crop,
-            historyIndex: historyIndex + 1,
-          });
-        }
+        const state = get();
+        if (!state.currentImageId) return;
+
+        const current = getCurrentImage(state);
+        if (!current || current.historyIndex >= current.history.length - 1) return;
+
+        const nextState = current.history[current.historyIndex + 1];
+        set({
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? {
+                ...img,
+                adjustments: nextState.adjustments,
+                crop: nextState.crop,
+                historyIndex: current.historyIndex + 1,
+              }
+              : img
+          ),
+        });
       },
 
       reset: () => {
+        const state = get();
+        if (!state.currentImageId) return;
+
         set({
-          adjustments: {
-            ...DEFAULT_ADJUSTMENTS,
-            curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
-          },
-          crop: { ...DEFAULT_CROP },
-          history: [],
-          historyIndex: -1,
+          images: state.images.map(img =>
+            img.id === state.currentImageId
+              ? {
+                ...img,
+                adjustments: {
+                  ...DEFAULT_ADJUSTMENTS,
+                  curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
+                },
+                crop: { ...DEFAULT_CROP },
+                history: [],
+                historyIndex: -1,
+              }
+              : img
+          ),
         });
       },
 
       clearAll: () => {
         set({
-          originalImage: null,
-          previewImage: null,
-          processedImage: null,
-          adjustments: {
-            ...DEFAULT_ADJUSTMENTS,
-            curves: JSON.parse(JSON.stringify(DEFAULT_CURVES))
-          },
-          crop: { ...DEFAULT_CROP },
-          history: [],
-          historyIndex: -1,
+          images: [],
+          currentImageId: null,
         });
       }
     }),
     {
       name: 'luma-forge-editor-storage', // unique name for storage key
       storage: createHybridStorage(),
-      // Persist adjustments, crop, and images
-      // Note: Images are stored as data URLs which can be large
-      // If you hit localStorage size limits, consider using IndexedDB instead
+      // Persist metadata (adjustments, crop, history) to localStorage
+      // Images are stored in IndexedDB to avoid localStorage quota limits
       partialize: (state) => ({
-        adjustments: state.adjustments,
-        crop: state.crop,
-        originalImage: state.originalImage,
-        previewImage: state.previewImage,
-        processedImage: state.processedImage,
-        history: state.history,
-        historyIndex: state.historyIndex,
+        images: state.images,
+        currentImageId: state.currentImageId,
       }),
       // Handle errors gracefully and manage loading state
       onRehydrateStorage: () => {
@@ -419,11 +670,16 @@ export const useEditorStore = create<EditorState>()(
               }
             }
           } else if (state && isClient) {
+            const imageCount = state.images?.length || 0;
+            const currentImage = state.currentImageId
+              ? state.images?.find(img => img.id === state.currentImageId)
+              : null;
             console.log('Store rehydrated successfully:', {
-              hasOriginalImage: !!state.originalImage,
-              hasPreviewImage: !!state.previewImage,
-              hasProcessedImage: !!state.processedImage,
-              originalImageSize: state.originalImage ? state.originalImage.length : 0,
+              imageCount,
+              hasCurrentImage: !!currentImage,
+              currentImageId: state.currentImageId,
+              totalImagesSize: state.images?.reduce((sum, img) =>
+                sum + (img.originalImage?.length || 0), 0) || 0,
             });
           }
         };
@@ -431,3 +687,75 @@ export const useEditorStore = create<EditorState>()(
     }
   )
 );
+
+// Selector hooks for backward compatibility
+export const useCurrentImage = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return null;
+    return state.images.find(img => img.id === state.currentImageId) || null;
+  });
+};
+
+export const useOriginalImage = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return null;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.originalImage || null;
+  });
+};
+
+export const usePreviewImage = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return null;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.previewImage || null;
+  });
+};
+
+export const useProcessedImage = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return null;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.processedImage || null;
+  });
+};
+
+export const useAdjustments = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return CACHED_DEFAULT_ADJUSTMENTS;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.adjustments || CACHED_DEFAULT_ADJUSTMENTS;
+  });
+};
+
+export const useCrop = () => {
+  return useEditorStore((state) => {
+    if (!state.currentImageId) return CACHED_DEFAULT_CROP;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.crop || CACHED_DEFAULT_CROP;
+  });
+};
+
+export const useHistory = () => {
+  const history = useEditorStore((state) => {
+    if (!state.currentImageId) return CACHED_EMPTY_HISTORY_ARRAY;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.history || CACHED_EMPTY_HISTORY_ARRAY;
+  });
+
+  const historyIndex = useEditorStore((state) => {
+    if (!state.currentImageId) return -1;
+    const current = state.images.find(img => img.id === state.currentImageId);
+    return current?.historyIndex ?? -1;
+  });
+
+  return useMemo(() => {
+    if (history === CACHED_EMPTY_HISTORY_ARRAY && historyIndex === -1) {
+      return CACHED_EMPTY_HISTORY;
+    }
+    return {
+      history,
+      historyIndex,
+    };
+  }, [history, historyIndex]);
+};

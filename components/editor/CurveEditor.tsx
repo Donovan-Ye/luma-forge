@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { Point } from '@/lib/store';
+import { Point, usePreviewImage } from '@/lib/store';
 import { useEditorStore } from '@/lib/store';
 
 interface CurveEditorProps {
@@ -15,7 +15,7 @@ export function CurveEditor({ points, onChange, color, channel }: CurveEditorPro
   const svgRef = useRef<SVGSVGElement>(null);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const previewImage = useEditorStore((state) => state.previewImage);
+  const previewImage = usePreviewImage();
   const [histogram, setHistogram] = useState<number[]>([]);
   // Track the original point being dragged to prevent drift after re-sorting
   const dragStartPointRef = useRef<Point | null>(null);

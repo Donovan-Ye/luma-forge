@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useEditorStore, ImageAdjustments, Point } from '@/lib/store';
+import { useAdjustments, useEditorStore, ImageAdjustments, Point } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import {
   Accordion,
@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
 
 export function AdjustmentsPanel() {
-  const { adjustments, updateAdjustments } = useEditorStore();
+  const adjustments = useAdjustments();
+  const updateAdjustments = useEditorStore((state) => state.updateAdjustments);
   const [activeCurve, setActiveCurve] = useState<'master' | 'red' | 'green' | 'blue'>('master');
 
   const handleChange = (key: keyof ImageAdjustments) => (value: number[]) => {
