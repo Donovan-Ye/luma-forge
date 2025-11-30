@@ -10,7 +10,7 @@ import {
   AccordionTrigger
 } from '@/components/ui/accordion';
 import { Sun, Spline, Sparkles, Aperture, RotateCcw, Droplet } from 'lucide-react';
-import { CurveEditor } from './CurveEditor';
+import { CurveEditor } from '../widgets/CurveEditor';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
 

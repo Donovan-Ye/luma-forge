@@ -3,9 +3,9 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Crop as CropIcon } from 'lucide-react';
-import { AdjustmentsPanel } from './AdjustmentsPanel';
-import { Histogram } from './Histogram';
-import { ImageMetadata } from './ImageMetadata';
+import { AdjustmentsPanel } from '../panels/AdjustmentsPanel';
+import { Histogram } from '../widgets/Histogram';
+import { ImageMetadata } from '../widgets/ImageMetadata';
 
 interface EditorSidebarProps {
   originalImage: string | null;

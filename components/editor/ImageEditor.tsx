@@ -2,12 +2,12 @@
 
 import { useState, useRef } from 'react';
 import { useEditorStore, useOriginalImage, useProcessedImage, useAdjustments, useCrop, useHistory } from '@/lib/store';
-import { CropTool } from './CropTool';
-import { EditorHeader } from './EditorHeader';
-import { CanvasViewport } from './CanvasViewport';
-import { ImageThumbnails } from './ImageThumbnails';
-import { EditorSidebar } from './EditorSidebar';
-import { LoadingState } from './LoadingState';
+import { CropTool } from './panels/CropTool';
+import { EditorHeader } from './components/EditorHeader';
+import { CanvasViewport } from './components/CanvasViewport';
+import { ImageThumbnails } from './components/ImageThumbnails';
+import { EditorSidebar } from './components/EditorSidebar';
+import { LoadingState } from './components/LoadingState';
 import {
   Dialog,
   DialogContent,
