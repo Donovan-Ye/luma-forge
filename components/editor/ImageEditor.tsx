@@ -114,32 +114,7 @@ export function ImageEditor() {
   };
 
   const handleClearAll = () => {
-    if (!originalImage) return;
-
-    const hasChanges = (
-      adjustments.exposure !== 0 ||
-      adjustments.contrast !== 0 ||
-      adjustments.saturation !== 0 ||
-      adjustments.temperature !== 0 ||
-      adjustments.tint !== 0 ||
-      adjustments.highlights !== 0 ||
-      adjustments.shadows !== 0 ||
-      adjustments.whiteBalance !== 0 ||
-      adjustments.sharpness !== 0 ||
-      adjustments.blur !== 0 ||
-      JSON.stringify(adjustments.curves.master) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
-      JSON.stringify(adjustments.curves.red) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
-      JSON.stringify(adjustments.curves.green) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
-      JSON.stringify(adjustments.curves.blue) !== JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }]) ||
-      (crop.width !== 0 && crop.height !== 0) ||
-      crop.rotation !== 0
-    );
-
-    if (hasChanges) {
-      setShowClearDialog(true);
-    } else {
-      clearAll();
-    }
+    setShowClearDialog(true);
   };
 
   return (

@@ -40,9 +40,6 @@ export function EditorHeader({
   processedImage,
   onExport,
   onClearAll,
-  adjustments,
-  crop,
-  originalImage,
 }: EditorHeaderProps) {
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between px-4 shrink-0 z-50">
