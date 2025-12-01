@@ -5,6 +5,7 @@ import { useEditorStore } from '@/lib/store';
 import { Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function ImageUpload() {
   const setImage = useEditorStore((state) => state.setImage);
@@ -76,6 +77,8 @@ export function ImageUpload() {
     }
   };
 
+  const { t } = useTranslation();
+
   return (
     <div
       className={cn(
@@ -91,12 +94,12 @@ export function ImageUpload() {
           <Upload className="w-10 h-10 text-primary" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold">Upload images to edit</h3>
+          <h3 className="text-xl font-semibold">{t('uploadHeading')}</h3>
           <p className="text-sm text-muted-foreground">
-            Drag and drop or click to select (multiple images supported)
+            {t('uploadDescription')}
           </p>
           <p className="text-xs text-muted-foreground">
-            Supports JPG, PNG, WebP
+            {t('uploadSupportedFormats')}
           </p>
         </div>
         <Button
@@ -104,7 +107,7 @@ export function ImageUpload() {
           variant="secondary"
           size="lg"
         >
-          Select Image
+          {t('uploadButton')}
         </Button>
         <input
           type="file"

@@ -9,11 +9,13 @@ import { CurveEditor } from '../widgets/CurveEditor';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
 import { AdjustmentSection } from './AdjustmentSection';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function AdjustmentsPanel() {
   const adjustments = useAdjustments();
   const updateAdjustments = useEditorStore((state) => state.updateAdjustments);
   const [activeCurve, setActiveCurve] = useState<'master' | 'red' | 'green' | 'blue'>('master');
+  const { t } = useTranslation();
 
   const handleChange = (key: keyof ImageAdjustments) => (value: number[]) => {
     updateAdjustments({ [key]: value[0] });
@@ -85,33 +87,33 @@ export function AdjustmentsPanel() {
         <AdjustmentSection
           value="light"
           icon={Sun}
-          title="Light"
+          title={t('adjustmentsLight')}
           onReset={resetLight}
-          resetTitle="Reset Light adjustments"
+          resetTitle={t('resetLight')}
         >
           <AdjustmentSlider
-            label="Exposure"
+            label={t('sliderExposure')}
             value={adjustments.exposure}
             onChange={handleChange('exposure')}
             min={-100}
             max={100}
           />
           <AdjustmentSlider
-            label="Contrast"
+            label={t('sliderContrast')}
             value={adjustments.contrast}
             onChange={handleChange('contrast')}
             min={-100}
             max={100}
           />
           <AdjustmentSlider
-            label="Highlights"
+            label={t('sliderHighlights')}
             value={adjustments.highlights}
             onChange={handleChange('highlights')}
             min={-100}
             max={100}
           />
           <AdjustmentSlider
-            label="Shadows"
+            label={t('sliderShadows')}
             value={adjustments.shadows}
             onChange={handleChange('shadows')}
             min={-100}
@@ -123,12 +125,12 @@ export function AdjustmentsPanel() {
         <AdjustmentSection
           value="color"
           icon={Aperture}
-          title="Color"
+          title={t('adjustmentsColor')}
           onReset={resetColor}
-          resetTitle="Reset Color adjustments"
+          resetTitle={t('resetColor')}
         >
           <AdjustmentSlider
-            label="Temperature"
+            label={t('sliderTemperature')}
             value={adjustments.temperature}
             onChange={handleChange('temperature')}
             min={-100}
@@ -136,7 +138,7 @@ export function AdjustmentsPanel() {
             colorGradient="temperature"
           />
           <AdjustmentSlider
-            label="Tint"
+            label={t('sliderTint')}
             value={adjustments.tint}
             onChange={handleChange('tint')}
             min={-100}
@@ -144,14 +146,14 @@ export function AdjustmentsPanel() {
             colorGradient="tint"
           />
           <AdjustmentSlider
-            label="White Balance"
+            label={t('sliderWhiteBalance')}
             value={adjustments.whiteBalance}
             onChange={handleChange('whiteBalance')}
             min={-100}
             max={100}
           />
           <AdjustmentSlider
-            label="Saturation"
+            label={t('sliderSaturation')}
             value={adjustments.saturation}
             onChange={handleChange('saturation')}
             min={-100}
@@ -163,19 +165,19 @@ export function AdjustmentsPanel() {
         <AdjustmentSection
           value="detail"
           icon={Sparkles}
-          title="Detail"
+          title={t('adjustmentsDetail')}
           onReset={resetDetail}
-          resetTitle="Reset Detail adjustments"
+          resetTitle={t('resetDetail')}
         >
           <AdjustmentSlider
-            label="Sharpness"
+            label={t('sliderSharpness')}
             value={adjustments.sharpness}
             onChange={handleChange('sharpness')}
             min={0}
             max={100}
           />
           <AdjustmentSlider
-            label="Blur"
+            label={t('sliderBlur')}
             value={adjustments.blur}
             onChange={handleChange('blur')}
             min={0}
@@ -187,9 +189,9 @@ export function AdjustmentsPanel() {
         <AdjustmentSection
           value="curves"
           icon={Spline}
-          title="Curves"
+          title={t('adjustmentsCurves')}
           onReset={resetCurves}
-          resetTitle="Reset Curves"
+          resetTitle={t('resetCurves')}
         >
           <div className="space-y-1.5 pb-4">
             {/* Channel Selector Buttons */}

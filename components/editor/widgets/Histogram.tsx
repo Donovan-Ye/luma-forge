@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface HistogramProps {
   imageSrc: string | null;
@@ -15,6 +16,7 @@ interface RGBHistogram {
 export function Histogram({ imageSrc }: HistogramProps) {
   const [histogram, setHistogram] = useState<RGBHistogram | null>(null);
   const currentImageSrcRef = useRef<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     currentImageSrcRef.current = imageSrc;
@@ -124,7 +126,7 @@ export function Histogram({ imageSrc }: HistogramProps) {
   if (!histogram) {
     return (
       <div className="h-32 bg-black border-b border-zinc-800 flex items-center justify-center">
-        <span className="text-xs text-zinc-600">No histogram data</span>
+        <span className="text-xs text-zinc-600">{t('histogramEmpty')}</span>
       </div>
     );
   }

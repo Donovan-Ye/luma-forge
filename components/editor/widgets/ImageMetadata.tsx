@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ImageMetadataProps {
   imageSrc: string | null;
@@ -23,6 +24,7 @@ interface ExifData {
 export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
   const [metadata, setMetadata] = useState<Metadata & { fileFormat?: string }>({});
   const currentImageSrcRef = useRef<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     currentImageSrcRef.current = imageSrc;
@@ -69,9 +71,9 @@ export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
           const exposureTime = exifData.ExposureTime;
           if (exposureTime < 1) {
             const denominator = Math.round(1 / exposureTime);
-            result.shutterSpeed = `1/${denominator}秒`;
+            result.shutterSpeed = t('metadataFractionSeconds', { value: denominator });
           } else {
-            result.shutterSpeed = `${exposureTime.toFixed(1)}秒`;
+            result.shutterSpeed = t('metadataSeconds', { value: exposureTime.toFixed(1) });
           }
         }
 
@@ -92,7 +94,7 @@ export function ImageMetadata({ imageSrc }: ImageMetadataProps) {
         setMetadata({ fileFormat });
       }
     });
-  }, [imageSrc]);
+  }, [imageSrc, t]);
 
   return (
     <div className="h-10 bg-zinc-900/50 border-b border-zinc-800 flex items-center justify-between px-4 text-xs text-zinc-300">

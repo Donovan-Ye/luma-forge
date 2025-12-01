@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Check, X, Loader2, Plus } from 'lucide-react';
 import 'react-image-crop/dist/ReactCrop.css';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface CropToolProps {
   onClose: () => void;
@@ -53,6 +54,7 @@ export function CropTool({ onClose }: CropToolProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const currentImage = images.find(img => img.id === currentImageId);
 
@@ -224,7 +226,7 @@ export function CropTool({ onClose }: CropToolProps) {
         {!isViewportReady && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-lg text-white">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <p className="text-sm">Calculating viewport...</p>
+            <p className="text-sm">{t('cropViewportCalculating')}</p>
           </div>
         )}
 
@@ -293,6 +295,7 @@ export function CropTool({ onClose }: CropToolProps) {
             <button
               onClick={() => fileInputRef.current?.click()}
               className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 flex items-center justify-center transition-colors"
+              title={t('cropAddImage')}
             >
               <Plus className="w-6 h-6 text-muted-foreground" />
             </button>
@@ -310,7 +313,7 @@ export function CropTool({ onClose }: CropToolProps) {
           <div className="flex items-center gap-8 max-w-2xl mx-auto w-full">
             <div className="flex-1 space-y-3">
               <div className="flex justify-between">
-                <Label>Rotation</Label>
+                <Label>{t('cropRotation')}</Label>
                 <span className="text-xs text-muted-foreground">{rotation}°</span>
               </div>
               <Slider
@@ -326,11 +329,11 @@ export function CropTool({ onClose }: CropToolProps) {
           <div className="flex justify-center gap-4">
             <Button variant="outline" onClick={onClose}>
               <X className="w-4 h-4 mr-2" />
-              Cancel
+              {t('cropCancel')}
             </Button>
             <Button onClick={handleApply}>
               <Check className="w-4 h-4 mr-2" />
-              Apply Crop
+              {t('cropApply')}
             </Button>
           </div>
         </div>

@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { ImageAdjustments, CropState } from '@/lib/store';
 import { BrandLogo } from '@/components/branding/BrandLogo';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+import { LanguageToggle } from './LanguageToggle';
 
 interface EditorHeaderProps {
   canUndo: boolean;
@@ -45,6 +47,13 @@ export function EditorHeader({
 }: EditorHeaderProps) {
   const iconButtonClassName = "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800";
   const iconClassName = "w-3! h-3!";
+  const { t } = useTranslation();
+
+  const exportLabel = isExporting
+    ? t('exportButtonExporting')
+    : selectedCount > 1
+      ? t('exportButtonCount', { count: selectedCount })
+      : t('exportButton');
 
   return (
     <header className="h-10 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between px-4 shrink-0 z-50">
@@ -52,7 +61,7 @@ export function EditorHeader({
         <button
           onClick={onClearAll}
           className="cursor-pointer transition-opacity hover:opacity-80"
-          aria-label="Reset workspace"
+          aria-label={t('resetWorkspace')}
         >
           <BrandLogo
             size={24}
@@ -102,14 +111,14 @@ export function EditorHeader({
                 setShowOriginal(true);
               }}
               className={`${iconButtonClassName} ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
-              title="Hold to view original image (or press Space)"
+              title={t('tooltipHoldOriginalDetail')}
             >
               <Eye className={iconClassName} />
             </Button>
             {/* Tooltip */}
             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-zinc-300 bg-zinc-800 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              Hold to view original
-              <span className="ml-1.5 text-zinc-500">(Space)</span>
+              {t('tooltipHoldOriginal')}
+              <span className="ml-1.5 text-zinc-500">{t('tooltipShortcut')}</span>
               <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-zinc-800"></div>
             </div>
           </div>
@@ -117,17 +126,14 @@ export function EditorHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <LanguageToggle />
         <Button
           size="sm"
           onClick={onExport}
           disabled={isExporting || !processedImage}
           className="bg-zinc-100 text-zinc-900 hover:bg-white py-1! text-xs h-6"
         >
-          {isExporting
-            ? 'Exporting...'
-            : selectedCount > 1
-              ? `Export (${selectedCount})`
-              : 'Export'}
+          {exportLabel}
         </Button>
       </div>
     </header>

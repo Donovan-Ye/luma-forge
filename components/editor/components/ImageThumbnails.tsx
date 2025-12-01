@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { ImageData } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ImageThumbnailsProps {
   images: ImageData[];
@@ -24,6 +25,7 @@ export function ImageThumbnails({
   const addImageInputRef = useRef<HTMLInputElement>(null);
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
   const lastClickedIndexRef = useRef<number | null>(null);
+  const { t } = useTranslation();
 
   // Filter out invalid selections (images that no longer exist) during render
   const validSelectedIds = useMemo(() => {
@@ -135,7 +137,7 @@ export function ImageThumbnails({
                     }
                   }}
                   className="absolute top-1 right-1 w-5 h-5 bg-red-500/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                  title="Remove image"
+                  title={t('thumbnailsRemoveTitle')}
                 >
                   ×
                 </button>
@@ -147,7 +149,7 @@ export function ImageThumbnails({
         <button
           onClick={() => addImageInputRef.current?.click()}
           className="shrink-0 h-full aspect-square rounded-lg border-2 border-dashed border-zinc-700 hover:border-zinc-600 bg-zinc-900/50 hover:bg-zinc-900 transition-all flex items-center justify-center group"
-          title="Add image"
+          title={t('thumbnailsAddTitle')}
         >
           <Plus className="w-6 h-6 text-zinc-500 group-hover:text-zinc-400 transition-colors" />
         </button>

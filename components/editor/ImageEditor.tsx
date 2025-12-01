@@ -24,6 +24,7 @@ import { useImageProcessing } from './hooks/useImageProcessing';
 import { processImage } from '@/lib/image-processing/canvas-utils';
 import { dataUrlToBlob, downloadBlob } from '@/lib/download-utils';
 import JSZip from 'jszip';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const EXPORT_QUALITY = 0.97;
 
@@ -67,6 +68,7 @@ export function ImageEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   useImageProcessing();
+  const { t } = useTranslation();
 
   // Determine if undo/redo should be enabled
   const canUndo = historyIndex >= 0;
@@ -132,7 +134,7 @@ export function ImageEditor() {
           isExporting: true,
           current: 1,
           total: 1,
-          currentImageName: 'Processing...',
+          currentImageName: t('exportProcessingSingle'),
         });
 
         // Process the FULL resolution image on export
@@ -173,7 +175,7 @@ export function ImageEditor() {
             isExporting: true,
             current: i + 1,
             total: imagesToExport.length,
-            currentImageName: `Processing image ${i + 1}...`,
+            currentImageName: t('exportProcessingMultiple', { index: i + 1 }),
           });
 
           // Process the FULL resolution image
@@ -204,7 +206,7 @@ export function ImageEditor() {
           isExporting: true,
           current: imagesToExport.length,
           total: imagesToExport.length,
-          currentImageName: 'Creating ZIP file...',
+          currentImageName: t('exportCreatingZip'),
         });
 
         // Generate ZIP file
@@ -219,7 +221,7 @@ export function ImageEditor() {
       }
     } catch (error) {
       console.error("Export failed", error);
-      alert("Failed to export images");
+      alert(t('exportError'));
     } finally {
       setIsExporting(false);
       setExportProgress(null);
@@ -300,9 +302,9 @@ export function ImageEditor() {
           <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Discard all changes?</DialogTitle>
+                <DialogTitle>{t('dialogDiscardTitle')}</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to discard all changes and start over? This will clear your current image and all adjustments. This action cannot be undone.
+                  {t('dialogDiscardDescription')}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -310,7 +312,7 @@ export function ImageEditor() {
                   variant="outline"
                   onClick={() => setShowClearDialog(false)}
                 >
-                  Cancel
+                  {t('dialogCancel')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -319,7 +321,7 @@ export function ImageEditor() {
                     setShowClearDialog(false);
                   }}
                 >
-                  Discard Changes
+                  {t('dialogConfirmDiscard')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -329,7 +331,7 @@ export function ImageEditor() {
           <Dialog open={!!exportProgress} onOpenChange={() => { }}>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Exporting Images</DialogTitle>
+                <DialogTitle>{t('dialogExportTitle')}</DialogTitle>
                 <DialogDescription>
                   {exportProgress && (
                     <div className="mt-4 space-y-2">

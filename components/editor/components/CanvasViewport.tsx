@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Crop, Loader2, Maximize2, Minus, Plus } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface CanvasViewportProps {
   canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -38,6 +39,7 @@ export function CanvasViewport({
   const [originalImageLoaded, setOriginalImageLoaded] = useState(false);
   const currentImageSrcRef = useRef<string | null>(null);
   const preloadImageRef = useRef<HTMLImageElement | null>(null);
+  const { t } = useTranslation();
 
   // Reset loaded state when image changes (separate effect to avoid lint issues)
   useEffect(() => {
@@ -233,7 +235,7 @@ export function CanvasViewport({
             onClick={onCropClick}
           >
             <Crop className="w-3.5 h-3.5 mr-1.5" />
-            Crop & Rotate
+            {t('cropRotate')}
           </Button>
         )}
       </div>
