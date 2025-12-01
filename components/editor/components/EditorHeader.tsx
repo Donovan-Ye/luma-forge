@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   RotateCcw,
-  Download,
   Undo,
   Redo,
   Eye,
@@ -41,12 +40,15 @@ export function EditorHeader({
   onExport,
   onClearAll,
 }: EditorHeaderProps) {
+  const iconButtonClassName = "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800";
+  const iconClassName = "w-3! h-3!";
+
   return (
-    <header className="h-14 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between px-4 shrink-0 z-50">
-      <div className="flex items-center gap-4">
+    <header className="h-10 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between px-4 shrink-0 z-50">
+      <div className="flex items-center gap-1">
         <button
           onClick={onClearAll}
-          className="font-semibold text-zinc-100 hover:text-white transition-colors cursor-pointer"
+          className="font-semibold text-zinc-100 text-xs hover:text-white transition-colors cursor-pointer"
         >
           Luma Forge
         </button>
@@ -57,26 +59,26 @@ export function EditorHeader({
             size="icon"
             onClick={undo}
             disabled={!canUndo}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            className={iconButtonClassName}
           >
-            <Undo className="w-4 h-4" />
+            <Undo className={iconClassName} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={redo}
             disabled={!canRedo}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            className={iconButtonClassName}
           >
-            <Redo className="w-4 h-4" />
+            <Redo className={iconClassName} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={reset}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            className={iconButtonClassName}
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className={iconClassName} />
           </Button>
           <div className="relative group">
             <Button
@@ -90,10 +92,10 @@ export function EditorHeader({
                 e.preventDefault();
                 setShowOriginal(true);
               }}
-              className={`text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
+              className={`${iconButtonClassName} ${showOriginal ? 'bg-zinc-800 text-zinc-100' : ''}`}
               title="Hold to view original image (or press Space)"
             >
-              <Eye className="w-4 h-4" />
+              <Eye className={iconClassName} />
             </Button>
             {/* Tooltip */}
             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-zinc-300 bg-zinc-800 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
@@ -110,9 +112,8 @@ export function EditorHeader({
           size="sm"
           onClick={onExport}
           disabled={isExporting || !processedImage}
-          className="bg-zinc-100 text-zinc-900 hover:bg-white"
+          className="bg-zinc-100 text-zinc-900 hover:bg-white py-1! text-xs h-6"
         >
-          <Download className="w-4 h-4 mr-2" />
           {isExporting ? 'Exporting...' : 'Export'}
         </Button>
       </div>
