@@ -341,9 +341,19 @@ interface AdjustmentSliderProps {
   min: number;
   max: number;
   colorGradient?: 'temperature' | 'tint';
+  defaultValue?: number;
 }
 
-function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: AdjustmentSliderProps) {
+function AdjustmentSlider({ label, value, onChange, min, max, colorGradient, defaultValue }: AdjustmentSliderProps) {
+  // Calculate default value: use provided defaultValue, or calculate as middle point for symmetric ranges, or default to 0
+  const defaultResetValue = defaultValue !== undefined
+    ? defaultValue
+    : (min < 0 && max > 0)
+      ? 0  // For symmetric ranges (-100 to 100), default is 0 (neutral)
+      : min === 0
+        ? 0  // For ranges starting at 0, default is 0 (original/unadjusted)
+        : Math.round((min + max) / 2);  // Otherwise use middle point
+
   // Local state for smooth dragging
   const [localValue, setLocalValue] = useState(value);
   const isDraggingRef = useRef(false);
@@ -403,6 +413,21 @@ function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: A
     isDraggingRef.current = true;
   }, []);
 
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Cancel any pending debounced updates
+    debouncedUpdateRef.current?.cancel();
+
+    // Reset to default value
+    setLocalValue(defaultResetValue);
+    onChange([defaultResetValue]);
+    lastCommittedValueRef.current = defaultResetValue;
+    debouncedPendingRef.current = false;
+    isDraggingRef.current = false;
+  }, [defaultResetValue, onChange]);
+
   // Handle pointer up globally to catch when dragging ends
   useEffect(() => {
     const handlePointerUp = () => {
@@ -443,7 +468,7 @@ function AdjustmentSlider({ label, value, onChange, min, max, colorGradient }: A
           {localValue}
         </span>
       </div>
-      <div onPointerDown={handlePointerDown} className="relative">
+      <div onPointerDown={handlePointerDown} onDoubleClick={handleDoubleClick} className="relative">
         {trackGradient && (
           <div
             className="absolute inset-0 pointer-events-none rounded-full"
