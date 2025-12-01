@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAdjustments, useEditorStore, ImageAdjustments, Point } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import { Accordion } from '@/components/ui/accordion';
-import { Sun, Spline, Sparkles, Aperture, Droplet } from 'lucide-react';
+import { Sun, Spline, Sparkles, Aperture } from 'lucide-react';
 import { CurveEditor } from '../widgets/CurveEditor';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
@@ -46,18 +46,12 @@ export function AdjustmentsPanel() {
     });
   };
 
-  const resetWhiteBalance = (e: React.MouseEvent) => {
+  const resetColor = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent accordion toggle
     updateAdjustments({
       temperature: 0,
       tint: 0,
       whiteBalance: 0,
-    });
-  };
-
-  const resetColor = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent accordion toggle
-    updateAdjustments({
       saturation: 0,
     });
   };
@@ -85,7 +79,7 @@ export function AdjustmentsPanel() {
 
   return (
     <div className="w-full h-full">
-      <Accordion type="multiple" defaultValue={["light", "whiteBalance", "color", "detail", "curves"]} className="w-full">
+      <Accordion type="multiple" defaultValue={["light", "color", "detail", "curves"]} className="w-full">
 
         {/* Light Section */}
         <AdjustmentSection
@@ -125,13 +119,13 @@ export function AdjustmentsPanel() {
           />
         </AdjustmentSection>
 
-        {/* White Balance Section */}
+        {/* Color Section */}
         <AdjustmentSection
-          value="whiteBalance"
-          icon={Droplet}
-          title="White Balance"
-          onReset={resetWhiteBalance}
-          resetTitle="Reset White Balance adjustments"
+          value="color"
+          icon={Aperture}
+          title="Color"
+          onReset={resetColor}
+          resetTitle="Reset Color adjustments"
         >
           <AdjustmentSlider
             label="Temperature"
@@ -156,16 +150,6 @@ export function AdjustmentsPanel() {
             min={-100}
             max={100}
           />
-        </AdjustmentSection>
-
-        {/* Color Section */}
-        <AdjustmentSection
-          value="color"
-          icon={Aperture}
-          title="Color"
-          onReset={resetColor}
-          resetTitle="Reset Color adjustments"
-        >
           <AdjustmentSlider
             label="Saturation"
             value={adjustments.saturation}
