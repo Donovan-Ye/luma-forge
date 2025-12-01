@@ -38,7 +38,7 @@ export function AdjustmentSection({
           </button>
         </div>
       </AccordionTrigger>
-      <AccordionContent className="px-2 pt-1 pb-1 space-y-2">
+      <AccordionContent className="px-4 pt-1 pb-1 space-y-2">
         {children}
       </AccordionContent>
     </AccordionItem>
