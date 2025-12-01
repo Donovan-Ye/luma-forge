@@ -78,7 +78,7 @@ export function AdjustmentsPanel() {
   };
 
   return (
-    <div className="w-full h-full py-1">
+    <div className="w-full h-full">
       <Accordion type="multiple" defaultValue={["light", "color", "detail", "curves"]} className="w-full">
 
         {/* Light Section */}
@@ -191,7 +191,7 @@ export function AdjustmentsPanel() {
           onReset={resetCurves}
           resetTitle="Reset Curves"
         >
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 pb-4">
             {/* Channel Selector Buttons */}
             <div className="flex items-center gap-1.5">
               <button
