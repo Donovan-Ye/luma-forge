@@ -24,6 +24,9 @@ import { useImageProcessing } from './hooks/useImageProcessing';
 import { processImage } from '@/lib/image-processing/canvas-utils';
 import JSZip from 'jszip';
 
+const EXPORT_QUALITY = 0.97;
+
+
 export function ImageEditor() {
   const {
     images,
@@ -132,13 +135,14 @@ export function ImageEditor() {
         });
 
         // Process the FULL resolution image on export
+        // Use JPEG format with 0.92 quality for good quality but smaller file size
         const fullResResult = await processImage(
           image.originalImage,
           image.adjustments,
           image.crop,
           {
             format: 'image/jpeg',
-            quality: 0.92
+            quality: EXPORT_QUALITY
           }
         );
 
@@ -146,36 +150,21 @@ export function ImageEditor() {
           throw new Error('Failed to process image');
         }
 
-        // Convert data URL to blob URL for more reliable downloads
-        let downloadUrl = fullResResult;
-        let blobUrl: string | null = null;
-
-        if (fullResResult.startsWith('data:')) {
-          const response = await fetch(fullResResult);
-          const blob = await response.blob();
-          blobUrl = URL.createObjectURL(blob);
-          downloadUrl = blobUrl;
-        }
-
         // Create download link and trigger download
         const link = document.createElement('a');
-        const timestamp = Date.now();
-        const filename = `luma-edit-${image.id}-${timestamp}.jpg`;
+        const filename = `luma-edit-${Date.now()}.jpg`;
         link.download = filename;
-        link.href = downloadUrl;
+        link.href = fullResResult;
         link.style.display = 'none';
-        link.setAttribute('download', filename);
 
+        // Append to DOM, click, then remove
         document.body.appendChild(link);
-        await new Promise(resolve => requestAnimationFrame(resolve));
         link.click();
 
+        // Clean up after a short delay
         setTimeout(() => {
           if (link.parentNode) {
             document.body.removeChild(link);
-          }
-          if (blobUrl) {
-            URL.revokeObjectURL(blobUrl);
           }
         }, 100);
       } else {
@@ -201,7 +190,7 @@ export function ImageEditor() {
             image.crop,
             {
               format: 'image/jpeg',
-              quality: 0.92
+              quality: EXPORT_QUALITY
             }
           );
 
