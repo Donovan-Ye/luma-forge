@@ -10,6 +10,7 @@ interface ImageThumbnailsProps {
   setCurrentImage: (id: string) => void;
   removeImage: (id: string) => void;
   addImage: (imageData: string) => void;
+  onSelectionChange?: (selectedIds: Set<string>) => void;
 }
 
 export function ImageThumbnails({
@@ -18,6 +19,7 @@ export function ImageThumbnails({
   setCurrentImage,
   removeImage,
   addImage,
+  onSelectionChange,
 }: ImageThumbnailsProps) {
   const addImageInputRef = useRef<HTMLInputElement>(null);
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
@@ -34,6 +36,11 @@ export function ImageThumbnails({
     });
     return valid;
   }, [images, selectedImageIds]);
+
+  // Notify parent of selection changes
+  useEffect(() => {
+    onSelectionChange?.(validSelectedIds);
+  }, [validSelectedIds, onSelectionChange]);
 
   // Update lastClickedIndexRef when currentImageId changes
   useEffect(() => {

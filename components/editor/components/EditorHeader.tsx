@@ -25,6 +25,7 @@ interface EditorHeaderProps {
   adjustments: ImageAdjustments;
   crop: CropState;
   originalImage: string | null;
+  selectedCount?: number;
 }
 
 export function EditorHeader({
@@ -39,6 +40,7 @@ export function EditorHeader({
   processedImage,
   onExport,
   onClearAll,
+  selectedCount = 0,
 }: EditorHeaderProps) {
   const iconButtonClassName = "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800";
   const iconClassName = "w-3! h-3!";
@@ -114,7 +116,11 @@ export function EditorHeader({
           disabled={isExporting || !processedImage}
           className="bg-zinc-100 text-zinc-900 hover:bg-white py-1! text-xs h-6"
         >
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting
+            ? 'Exporting...'
+            : selectedCount > 1
+              ? `Export (${selectedCount})`
+              : 'Export'}
         </Button>
       </div>
     </header>
