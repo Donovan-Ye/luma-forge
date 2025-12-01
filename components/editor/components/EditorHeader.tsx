@@ -9,6 +9,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { ImageAdjustments, CropState } from '@/lib/store';
+import { BrandLogo } from '@/components/branding/BrandLogo';
 
 interface EditorHeaderProps {
   canUndo: boolean;
@@ -50,9 +51,15 @@ export function EditorHeader({
       <div className="flex items-center gap-1">
         <button
           onClick={onClearAll}
-          className="font-semibold text-zinc-100 text-xs hover:text-white transition-colors cursor-pointer"
+          className="cursor-pointer transition-opacity hover:opacity-80"
+          aria-label="Reset workspace"
         >
-          Luma Forge
+          <BrandLogo
+            size={24}
+            priority
+            wordmarkClassName="text-xs text-zinc-100"
+            className="gap-1"
+          />
         </button>
         <Separator orientation="vertical" className="h-6 bg-zinc-800" />
         <div className="flex items-center gap-1">
