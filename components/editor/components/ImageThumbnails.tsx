@@ -101,12 +101,12 @@ export function ImageThumbnails({
               <button
                 onClick={(e) => handleImageClick(image.id, index, e)}
                 className={`
-                  relative w-full h-full rounded-lg overflow-hidden border-2 transition-all
+                  relative w-full h-full rounded-lg overflow-hidden border-2
                   ${isCurrent
                     ? 'border-primary ring-2 ring-primary/20'
                     : isSelected
                       ? 'border-blue-500 ring-2 ring-blue-500/20'
-                      : 'border-zinc-800 hover:border-zinc-700'
+                      : 'border-zinc-800 hover:border-zinc-700 transition-colors'
                   }
                 `}
               >
