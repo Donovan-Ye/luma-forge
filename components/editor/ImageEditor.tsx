@@ -99,10 +99,14 @@ export function ImageEditor() {
     setIsExporting(true);
     try {
       // Process the FULL resolution image on export
-      const fullResResult = await processImage(originalImage, adjustments, crop);
+      // Use JPEG format with 0.92 quality for good quality but smaller file size
+      const fullResResult = await processImage(originalImage, adjustments, crop, {
+        format: 'image/jpeg',
+        quality: 0.92
+      });
 
       const link = document.createElement('a');
-      link.download = `luma-edit-${Date.now()}.png`;
+      link.download = `luma-edit-${Date.now()}.jpg`;
       link.href = fullResResult;
       link.click();
     } catch (error) {

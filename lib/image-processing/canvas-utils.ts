@@ -4,8 +4,11 @@ import { getImageWorker } from './worker-loader';
 export async function processImage(
   imageSrc: string,
   adjustments: ImageAdjustments,
-  crop: CropState
+  crop: CropState,
+  options?: { format?: 'image/jpeg' | 'image/png'; quality?: number }
 ): Promise<string> {
+  const format = options?.format || 'image/jpeg';
+  const quality = options?.quality ?? (format === 'image/jpeg' ? 0.92 : undefined);
   return new Promise(async (resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -151,7 +154,7 @@ export async function processImage(
           const imageData = ctx.getImageData(0, 0, rotatedWidth, rotatedHeight);
           const processedImageData = await processImageInWorker(imageData, adjustments);
           ctx.putImageData(processedImageData, 0, 0);
-          resolve(canvas.toDataURL('image/png'));
+          resolve(canvas.toDataURL(format, quality));
           return;
         } else if (hasCrop) {
           // Simple crop without rotation
@@ -192,7 +195,7 @@ export async function processImage(
 
         // 5. Export (use requestAnimationFrame to avoid blocking)
         await new Promise(resolve => requestAnimationFrame(resolve));
-        resolve(canvas.toDataURL('image/png'));
+        resolve(canvas.toDataURL(format, quality));
 
       } catch (error) {
         reject(error);
