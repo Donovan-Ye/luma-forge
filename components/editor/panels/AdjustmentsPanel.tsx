@@ -78,7 +78,7 @@ export function AdjustmentsPanel() {
   };
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full py-1">
       <Accordion type="multiple" defaultValue={["light", "color", "detail", "curves"]} className="w-full">
 
         {/* Light Section */}
