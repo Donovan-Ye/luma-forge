@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Maximize2, Minus, Plus } from 'lucide-react';
+import { Crop, Loader2, Maximize2, Minus, Plus } from 'lucide-react';
 
 interface CanvasViewportProps {
   canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -17,6 +17,7 @@ interface CanvasViewportProps {
   setZoomLevel: (level: number | ((prev: number) => number)) => void;
   setPanX: (x: number) => void;
   setPanY: (y: number) => void;
+  onCropClick?: () => void;
 }
 
 export function CanvasViewport({
@@ -32,6 +33,7 @@ export function CanvasViewport({
   setZoomLevel,
   setPanX,
   setPanY,
+  onCropClick,
 }: CanvasViewportProps) {
   const [originalImageLoaded, setOriginalImageLoaded] = useState(false);
   const currentImageSrcRef = useRef<string | null>(null);
@@ -223,6 +225,17 @@ export function CanvasViewport({
             <Maximize2 className="w-3 h-3" />
           </Button>
         </div>
+        {onCropClick && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-white"
+            onClick={onCropClick}
+          >
+            <Crop className="w-3.5 h-3.5 mr-1.5" />
+            Crop & Rotate
+          </Button>
+        )}
       </div>
     </>
   );

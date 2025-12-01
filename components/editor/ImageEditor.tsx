@@ -188,6 +188,7 @@ export function ImageEditor() {
                 setZoomLevel={setZoomLevel}
                 setPanX={setPanX}
                 setPanY={setPanY}
+                onCropClick={() => setIsCropping(true)}
               />
 
               <ImageThumbnails
@@ -202,7 +203,6 @@ export function ImageEditor() {
             <EditorSidebar
               originalImage={originalImage}
               processedImage={processedImage}
-              onCropClick={() => setIsCropping(true)}
             />
           </div>
 
