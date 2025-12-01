@@ -22,6 +22,7 @@ import { useDragAndPan } from './hooks/useDragAndPan';
 import { useZoom } from './hooks/useZoom';
 import { useImageProcessing } from './hooks/useImageProcessing';
 import { processImage } from '@/lib/image-processing/canvas-utils';
+import { dataUrlToBlob, downloadBlob } from '@/lib/download-utils';
 import JSZip from 'jszip';
 
 const EXPORT_QUALITY = 0.97;
@@ -123,7 +124,7 @@ export function ImageEditor() {
     });
 
     try {
-      // For single image, download directly (works reliably)
+      // For single image, download directly
       if (imagesToExport.length === 1) {
         const image = imagesToExport[0];
 
@@ -135,7 +136,7 @@ export function ImageEditor() {
         });
 
         // Process the FULL resolution image on export
-        // Use JPEG format with 0.92 quality for good quality but smaller file size
+        // Use JPEG format with high quality for good quality but smaller file size
         const fullResResult = await processImage(
           image.originalImage,
           image.adjustments,
@@ -150,23 +151,15 @@ export function ImageEditor() {
           throw new Error('Failed to process image');
         }
 
-        // Create download link and trigger download
-        const link = document.createElement('a');
+        const blob = await dataUrlToBlob(fullResResult);
         const filename = `luma-edit-${Date.now()}.jpg`;
-        link.download = filename;
-        link.href = fullResResult;
-        link.style.display = 'none';
 
-        // Append to DOM, click, then remove
-        document.body.appendChild(link);
-        link.click();
-
-        // Clean up after a short delay
-        setTimeout(() => {
-          if (link.parentNode) {
-            document.body.removeChild(link);
-          }
-        }, 100);
+        await downloadBlob(blob, {
+          filename,
+          description: 'JPEG Image',
+          accept: { 'image/jpeg': ['.jpg', '.jpeg'] },
+        });
+        return;
       } else {
         // For multiple images, create a ZIP file
         const zip = new JSZip();
@@ -200,8 +193,7 @@ export function ImageEditor() {
           }
 
           // Convert data URL to blob
-          const response = await fetch(fullResResult);
-          const blob = await response.blob();
+          const blob = await dataUrlToBlob(fullResResult);
 
           // Add to ZIP with a clean filename
           const filename = `luma-edit-${image.id}-${i + 1}.jpg`;
@@ -217,26 +209,13 @@ export function ImageEditor() {
 
         // Generate ZIP file
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const zipUrl = URL.createObjectURL(zipBlob);
-
-        // Download ZIP file
-        const link = document.createElement('a');
         const zipFilename = `luma-export-${timestamp}.zip`;
-        link.download = zipFilename;
-        link.href = zipUrl;
-        link.style.display = 'none';
-        link.setAttribute('download', zipFilename);
 
-        document.body.appendChild(link);
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        link.click();
-
-        setTimeout(() => {
-          if (link.parentNode) {
-            document.body.removeChild(link);
-          }
-          URL.revokeObjectURL(zipUrl);
-        }, 100);
+        await downloadBlob(zipBlob, {
+          filename: zipFilename,
+          description: 'Luma Forge Export',
+          accept: { 'application/zip': ['.zip'] },
+        });
       }
     } catch (error) {
       console.error("Export failed", error);
