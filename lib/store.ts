@@ -4,9 +4,7 @@ import { useMemo } from 'react';
 import {
   storeImageBlobs,
   getImageBlobs,
-  deleteImageBlobs,
   clearAllImageBlobs,
-  getAllImageIds,
 } from './indexeddb-utils';
 
 export interface Point { x: number; y: number }
@@ -62,6 +60,7 @@ interface EditorState {
   // Actions
   setImage: (imageData: string) => void;
   addImage: (imageData: string) => void;
+  addImages: (imageData: string[]) => void;
   removeImage: (imageId: string) => void;
   setCurrentImage: (imageId: string) => void;
   setPreviewImage: (imageData: string) => void;
@@ -116,6 +115,15 @@ const CACHED_EMPTY_HISTORY = Object.freeze({ history: CACHED_EMPTY_HISTORY_ARRAY
 // Helper to check if we're on the client side
 const isClient = typeof window !== 'undefined';
 
+// Helper to generate a UUID for image IDs
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 // Type for the persisted state (without functions)
 type PersistedState = {
   images: ImageData[];
@@ -158,7 +166,7 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
   const STORAGE_VERSION = 2; // Increment when storage format changes
 
   return {
-    getItem: async (_name: string) => {
+    getItem: async () => {
       try {
         // Get metadata from localStorage
         const settingsStr = localStorage.getItem(SETTINGS_KEY);
@@ -249,60 +257,6 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
           };
         }
 
-        // Very old legacy format - migrate single image
-        if (state.originalImage) {
-          const imageId = '1';
-
-          // Store in IndexedDB
-          await storeImageBlobs(
-            imageId,
-            state.originalImage || null,
-            state.previewImage || null,
-            state.processedImage || state.originalImage || null
-          );
-
-          const migratedImage: ImageData = {
-            id: imageId,
-            originalImage: state.originalImage,
-            previewImage: state.previewImage || null,
-            processedImage: state.processedImage || state.originalImage,
-            adjustments: state.adjustments || { ...DEFAULT_ADJUSTMENTS },
-            crop: state.crop || { ...DEFAULT_CROP },
-            history: state.history || [],
-            historyIndex: state.historyIndex ?? -1,
-          };
-
-          // Save metadata only
-          const metadataOnly: PersistedMetadata = {
-            imageMetadata: [{
-              id: imageId,
-              adjustments: migratedImage.adjustments,
-              crop: migratedImage.crop,
-              history: migratedImage.history,
-              historyIndex: migratedImage.historyIndex,
-            }],
-            currentImageId: '1',
-            storageVersion: STORAGE_VERSION,
-          };
-
-          try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-              state: metadataOnly,
-              version: settings.version || 0,
-            }));
-          } catch (error) {
-            console.error('Failed to save migrated metadata:', error);
-          }
-
-          return {
-            state: {
-              images: [migratedImage],
-              currentImageId: '1',
-            },
-            version: settings.version || 0,
-          };
-        }
-
         return null;
       } catch (error) {
         console.error('Error getting from hybrid storage:', error);
@@ -312,6 +266,7 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
 
     setItem: async (_name: string, value) => {
       try {
+        void _name;
         const state = (value as { state: PersistedState; version?: number }).state;
         const version = (value as { version?: number }).version || 0;
 
@@ -368,14 +323,6 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
         // Store all images in IndexedDB
         await Promise.all(storagePromises);
 
-        // Clean up IndexedDB: remove images that are no longer in state
-        const currentImageIds = new Set(state.images.map(img => img.id));
-        const allStoredIds = await getAllImageIds();
-
-        if (allStoredIds && allStoredIds.length > 0) {
-          const idsToDelete = allStoredIds.filter(id => !currentImageIds.has(id));
-          await Promise.all(idsToDelete.map(id => deleteImageBlobs(id)));
-        }
       } catch (error) {
         console.error('Error setting hybrid storage:', error);
         // If localStorage is still full (shouldn't happen with metadata only), try to clear old data
@@ -413,6 +360,7 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
 
     removeItem: async (_name: string): Promise<void> => {
       try {
+        void _name;
         localStorage.removeItem(SETTINGS_KEY);
         await clearAllImageBlobs();
       } catch (error) {
@@ -423,8 +371,8 @@ const createHybridStorage = (): PersistStorage<PersistedState> => {
 };
 
 // Helper to create a new image data object
-const createImageData = (imageData: string, id?: string): ImageData => ({
-  id: id || String(Date.now()),
+const createImageData = (imageData: string): ImageData => ({
+  id: generateId(),
   originalImage: imageData,
   previewImage: null,
   processedImage: imageData,
@@ -466,6 +414,22 @@ export const useEditorStore = create<EditorState>()(
           images: [...state.images, newImage],
           currentImageId: newImage.id,
         }));
+      },
+
+      addImages: (imageDataArray) => {
+        if (!imageDataArray || imageDataArray.length === 0) return;
+
+        set((state) => {
+          const newImages = imageDataArray.map((data) => createImageData(data));
+          const updatedImages = [...state.images, ...newImages];
+          console.log('updatedImages', updatedImages)
+          const lastImage = newImages[newImages.length - 1];
+
+          return {
+            images: updatedImages,
+            currentImageId: lastImage.id,
+          };
+        });
       },
 
       removeImage: (imageId) => {

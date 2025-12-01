@@ -44,21 +44,21 @@ function openDB(): Promise<IDBDatabase> {
  */
 function dataURLToBlob(dataURL: string): Blob | null {
   if (!dataURL) return null;
-  
+
   try {
     const arr = dataURL.split(',');
     if (arr.length < 2) return null;
-    
+
     const mimeMatch = arr[0].match(/:(.*?);/);
     const mime = mimeMatch ? mimeMatch[1] : 'image/png';
     const bstr = atob(arr[1]);
     let n = bstr.length;
     const u8arr = new Uint8Array(n);
-    
+
     while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    
+
     return new Blob([u8arr], { type: mime });
   } catch (error) {
     console.error('Failed to convert data URL to blob:', error);
@@ -71,7 +71,7 @@ function dataURLToBlob(dataURL: string): Blob | null {
  */
 function blobToDataURL(blob: Blob | null): Promise<string | null> {
   if (!blob) return Promise.resolve(null);
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {

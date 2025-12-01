@@ -2,18 +2,18 @@
 
 import { useState, useRef } from 'react';
 import { useEditorStore } from '@/lib/store';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function ImageUpload() {
   const setImage = useEditorStore((state) => state.setImage);
-  const addImage = useEditorStore((state) => state.addImage);
+  const addImages = useEditorStore((state) => state.addImages);
   const images = useEditorStore((state) => state.images);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
@@ -22,19 +22,34 @@ export function ImageUpload() {
     // If no images exist, use setImage for the first one, otherwise use addImage
     const isFirstImage = images.length === 0;
 
-    imageFiles.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          if (isFirstImage && index === 0) {
-            setImage(e.target.result as string);
+    // Load all files first, then update the store in one batch
+    const loadFile = (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            resolve(e.target.result as string);
           } else {
-            addImage(e.target.result as string);
+            reject(new Error('Failed to read file'));
           }
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+    const loadedImages = await Promise.all(
+      imageFiles.map((file) => loadFile(file)),
+    );
+
+    if (isFirstImage) {
+      const [first, ...rest] = loadedImages;
+      setImage(first);
+      if (rest.length > 0) {
+        addImages(rest);
+      }
+    } else {
+      addImages(loadedImages);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
