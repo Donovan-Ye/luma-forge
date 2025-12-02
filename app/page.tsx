@@ -5,11 +5,13 @@ const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Luma Forge",
+  alternateName: "Luma Forge 在线图片编辑器",
+  inLanguage: ["en", "zh"],
   url: siteUrl,
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Web",
   description:
-    "Luma Forge is a premium, browser-native image editor with pro-level adjustments, precise cropping, and export-ready workflows.",
+    "Luma Forge is a premium, browser-native image editor with pro-level adjustments, precise cropping, and export-ready workflows. Luma Forge 是一款运行在浏览器中的专业级在线图片编辑器，提供曝光、曲线、色温、裁剪等完整调色工具。",
   image: `${siteUrl}/logo.png`,
   offers: {
     "@type": "Offer",

@@ -16,9 +16,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteTitle = "Luma Forge | Online Image Editor";
+// Bilingual SEO-friendly title & description (English + Chinese)
+const siteTitle = "Luma Forge 在线图片编辑器 | Luma Forge Online Image Editor";
 const siteDescription =
-  "Luma Forge is a premium, browser-native image editor with pro-grade adjustments, fast cropping, and export-ready color workflows.";
+  "Luma Forge 是一款专业级在线图片编辑器，支持曝光、色彩、曲线、裁剪等高级调色与裁切功能。Luma Forge is a premium, browser-native image editor with pro-grade adjustments, fast cropping, and export-ready color workflows.";
+
+const keywordsEn = [
+  "Luma Forge",
+  "online image editor",
+  "photo editor",
+  "web-based photoshop",
+  "image adjustments",
+  "photo cropping",
+  "color grading",
+  "photo retouching",
+  "browser photo editor",
+  "RAW adjustments",
+];
+
+const keywordsZh = [
+  "在线图片编辑器",
+  "图片编辑",
+  "在线修图",
+  "照片编辑",
+  "网页版图片编辑器",
+  "图片裁剪",
+  "图片调色",
+  "在线调色",
+  "专业修图工具",
+  "在线曲线调节",
+];
+
+const zhQueryParamUrl = `${siteUrl}?lang=zh`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -32,18 +61,15 @@ export const metadata: Metadata = {
   authors: [{ name: "Luma Forge" }],
   creator: "Luma Forge",
   publisher: "Luma Forge",
-  keywords: [
-    "Luma Forge",
-    "online image editor",
-    "photo editor",
-    "web-based photoshop",
-    "image adjustments",
-    "photo cropping",
-    "color grading",
-  ],
+  keywords: [...keywordsEn, ...keywordsZh],
   category: "technology",
   alternates: {
     canonical: siteUrl,
+    languages: {
+      "en-US": siteUrl,
+      "zh-CN": zhQueryParamUrl,
+      "x-default": siteUrl,
+    },
   },
   openGraph: {
     title: siteTitle,
@@ -51,6 +77,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: "Luma Forge",
     locale: "en_US",
+    alternateLocale: ["zh_CN"],
     type: "website",
     images: [
       {
