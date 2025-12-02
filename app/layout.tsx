@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { siteUrl } from "@/lib/config/site";
 import { LocaleProvider } from "@/providers/LocaleProvider";
+import { I18nProvider } from "@/components/i18n/I18nProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -111,7 +112,9 @@ export default function RootLayout({
           "antialiased min-h-screen bg-background text-foreground"
         )}
       >
-        <LocaleProvider>{children}</LocaleProvider>
+        <I18nProvider>
+          <LocaleProvider>{children}</LocaleProvider>
+        </I18nProvider>
       </body>
     </html>
   );

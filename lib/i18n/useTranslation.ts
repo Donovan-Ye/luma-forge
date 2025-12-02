@@ -12,8 +12,10 @@ export function useTranslation() {
   const { t: i18nT } = useI18NextTranslation();
 
   const t = useCallback(
-    (key: TranslationKey, replacements?: TemplateReplacements) =>
-      i18nT(key, replacements),
+    (key: TranslationKey, replacements?: TemplateReplacements) => {
+      // Always return translation - I18nProvider ensures i18n is ready before rendering
+      return i18nT(key, replacements);
+    },
     [i18nT],
   );
 
