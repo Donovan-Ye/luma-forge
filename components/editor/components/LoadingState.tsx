@@ -22,7 +22,7 @@ export function LoadingState({ isLoading, hasImage }: LoadingStateProps) {
               className="justify-center"
               wordmarkClassName="text-4xl font-bold tracking-tight text-foreground"
             />
-            <p className="text-lg text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               {t('loadingWorkspace')}
             </p>
           </div>
