@@ -26,7 +26,7 @@ export function BrandLogo({
       aria-label="Luma Forge"
     >
       <Image
-        src="/logo.png"
+        src="/logo2.png"
         alt="Luma Forge logo"
         width={size}
         height={size}
