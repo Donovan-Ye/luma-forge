@@ -46,6 +46,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         void i18n.changeLanguage(resolved).catch((error) => {
           console.error('Failed to change language', error);
         });
+        // Manually save to localStorage since we removed LanguageDetector
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('i18nextLng', resolved);
+        }
       }
 
       return resolved;

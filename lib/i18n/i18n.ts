@@ -2,7 +2,6 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './locales/en.json';
 import zh from './locales/zh.json';
 import type { Locale } from './translations';
@@ -40,7 +39,6 @@ const initialLanguage = detectInitialLanguage();
 
 if (!i18n.isInitialized) {
   void i18n
-    .use(LanguageDetector)
     .use(initReactI18next)
     .init({
       resources,
@@ -48,14 +46,15 @@ if (!i18n.isInitialized) {
       fallbackLng: 'en',
       defaultNS,
       initImmediate: false,
-      detection: {
-        order: ['localStorage', 'navigator', 'htmlTag'],
-        caches: ['localStorage'],
-        lookupLocalStorage: storageKey,
-      },
       interpolation: {
         escapeValue: false,
       },
+    })
+    .then(() => {
+      // Ensure the language is set correctly after initialization
+      if (i18n.language !== initialLanguage) {
+        void i18n.changeLanguage(initialLanguage);
+      }
     })
     .catch((error) => {
       console.error('Failed to initialize i18next', error);
