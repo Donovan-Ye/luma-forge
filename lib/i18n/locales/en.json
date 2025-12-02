@@ -47,8 +47,8 @@
   "sliderSaturation": "Saturation",
   "sliderSharpness": "Sharpness",
   "sliderBlur": "Blur",
-  "metadataSeconds": "{value}s",
-  "metadataFractionSeconds": "1/{value}s",
+  "metadataSeconds": "{{value}}s",
+  "metadataFractionSeconds": "1/{{value}}s",
   "cropAddImage": "Add image",
   "holdToView": "Hold to view original",
   "uploadingButtonTitle": "Add image",
@@ -56,4 +56,3 @@
   "languageChinese": "中文",
   "languageLabel": "Language"
 }
-

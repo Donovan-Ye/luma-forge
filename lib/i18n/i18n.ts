@@ -63,9 +63,6 @@ if (typeof window !== 'undefined') {
         fallbackLng: 'en',
         defaultNS,
         initImmediate: true, // Initialize immediately to prevent async delay
-        interpolation: {
-          escapeValue: false,
-        },
       })
       .then(() => {
         // Double-check language is correct after init

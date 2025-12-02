@@ -47,8 +47,8 @@
   "sliderSaturation": "饱和度",
   "sliderSharpness": "锐化",
   "sliderBlur": "模糊",
-  "metadataSeconds": "{value}秒",
-  "metadataFractionSeconds": "1/{value}秒",
+  "metadataSeconds": "{{value}}秒",
+  "metadataFractionSeconds": "1/{{value}}秒",
   "cropAddImage": "添加图片",
   "holdToView": "按住查看原图",
   "uploadingButtonTitle": "添加图片",
@@ -56,4 +56,3 @@
   "languageChinese": "中文",
   "languageLabel": "语言"
 }
-
